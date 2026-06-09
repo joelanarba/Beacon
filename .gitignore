@@ -1,0 +1,23 @@
+.env
+.env.*
+*.pem
+*.key
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.vscode/
+.idea/
+.DS_Store
+benchmarks/results/
+*.log
+docker-compose.override.yml
+
+# Local-only dev notes / personal runbook
+DEV_NOTES.md
+
+# Local planning / scratch notes
+tasks/
