@@ -1,0 +1,121 @@
+{
+  "uid": "beacon-overview",
+  "title": "Beacon — Emergency Coordination",
+  "tags": ["beacon"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-30m", "to": "now" },
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Incidents by channel",
+      "description": "The headline: reports arriving over each ingress channel.",
+      "datasource": { "type": "prometheus", "uid": "beaconprom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 15, "stacking": { "mode": "normal" } } },
+        "overrides": []
+      },
+      "options": { "legend": { "displayMode": "table", "placement": "right" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "beaconprom" },
+          "expr": "sum by (source_channel) (beacon_incidents_total)",
+          "legendFormat": "{{source_channel}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "piechart",
+      "title": "Incidents by severity",
+      "datasource": { "type": "prometheus", "uid": "beaconprom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "values": ["value"] }, "pieType": "donut" },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "beaconprom" },
+          "expr": "sum by (severity) (beacon_incidents_total)",
+          "legendFormat": "{{severity}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Dispatch latency — report to assignment (p95, s)",
+      "datasource": { "type": "prometheus", "uid": "beaconprom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "beaconprom" },
+          "expr": "histogram_quantile(0.95, sum(rate(beacon_dispatch_latency_seconds_bucket[5m])) by (le, source_channel))",
+          "legendFormat": "p95 {{source_channel}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "bargauge",
+      "title": "Available responders by type",
+      "datasource": { "type": "prometheus", "uid": "beaconprom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "min": 0, "color": { "mode": "continuous-GrYlRd" } }, "overrides": [] },
+      "options": { "displayMode": "gradient", "orientation": "horizontal", "showUnfilled": true },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "beaconprom" },
+          "expr": "beacon_active_responders",
+          "legendFormat": "{{type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Notification outcomes",
+      "description": "Outbound notifications by egress channel + result (WebSocket vs SMS-out).",
+      "datasource": { "type": "prometheus", "uid": "beaconprom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 50, "stacking": { "mode": "normal" } } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right" }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "beaconprom" },
+          "expr": "sum by (egress_channel, result) (beacon_notifications_total)",
+          "legendFormat": "{{egress_channel}} / {{result}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "USSD session outcomes",
+      "description": "Menu-walk funnel on the GSM signaling channel.",
+      "datasource": { "type": "prometheus", "uid": "beaconprom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "color": { "mode": "palette-classic" } }, "overrides": [] },
+      "options": { "colorMode": "background", "graphMode": "area", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "beaconprom" },
+          "expr": "sum by (outcome) (beacon_ussd_sessions_total)",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}
