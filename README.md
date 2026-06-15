@@ -1,148 +1,118 @@
-# Beacon
+# Beacon — Resilient Emergency Coordination Backend
 
-Beacon is an emergency-response coordination backend I built to keep working when
-the network is falling apart. The idea started from one observation: when mobile
-data drops, most apps are useless, but USSD and SMS keep working because they ride
-the GSM signaling channel instead of data. Someone on a basic feature phone with
-one bar of signal can still report an emergency, so the system behind them should
-still be able to coordinate a response.
+Beacon is a resilient, multi-channel emergency coordination system designed to maintain service reliability across a connectivity gradient. In critical situations where mobile data connections are unavailable or drop, Beacon utilizes GSM signaling (SMS and USSD) to ensure emergency incident reports are successfully ingested, prioritized, and dispatched to responders and healthcare facilities.
 
-I'm a computer science student at the University of Cape Coast in Ghana, and I
-wanted a backend project grounded in a real constraint here instead of another
-generic CRUD app. The part I find interesting isn't any single feature. It's that
-the same incident can arrive over three very different channels and nothing
-downstream has to care which one it came from.
+---
 
-## The idea
+## Architecture Overview
 
-Connectivity isn't on or off, it's a gradient. Beacon accepts reports across that
-whole range and keeps as much capability as the channel can give it:
-
-| Channel | Connectivity | What it looks like | What it can capture |
-|---------|--------------|--------------------|---------------------|
-| Web / mobile app | mobile data | real-time, two-way (WebSocket) | everything: GPS, media, live status |
-| USSD | GSM signaling | a menu session (`*920#`) | structured: the menu walk builds the report |
-| SMS | GSM signaling | one store-and-forward text | minimal: a keyword plus free text |
-
-Each channel is normalised into a single `IncidentEvent`. An app report carries
-GPS and a photo URL; a USSD report carries a coarse area picked from the menu; an
-SMS report might only have a keyword and a sentence. Those differences show up as
-fields that are present or missing on the event, never as separate branches later
-on. The dispatch engine only ever sees `IncidentEvent` and treats them all the
-same.
-
-USSD and SMS are simulated locally so I don't need a paid provider account, but
-the simulator speaks the real Africa's Talking callback format (`sessionId`,
-`phoneNumber`, `text` that accumulates menu choices as `"1*2*3"`, replies prefixed
-`CON ` to continue or `END ` to finish). Swapping in a real provider later is a
-drop-in change, nothing else moves.
-
-## How it works
+Beacon's ingestion pipeline normalizes inbound reports from multiple channels into a unified event structure, decoupling ingestion logic from the downstream dispatch and notification engine.
 
 ```
-app / USSD / SMS
-      |  each adapter normalises its input into one IncidentEvent
-      v
-Ingestion API (FastAPI)  -> validate, classify severity, save (REPORTED)
-      |  publish incident.reported (fire-and-forget, off the request path)
-      v
-RabbitMQ  -> topic exchange, priority queues keyed to triage severity
-      |
-      v
-Dispatch engine
-   - triage: severity -> queue priority, type -> responder kind
-   - responder match: Redis GEO, nearest AVAILABLE, expanding radius
-   - hospital match: Postgres, capacity + specialty, bed reserved
-   - write the Assignment, emit incident.assigned
-      |
-      v
-Notification: reach each party on a channel they can actually use
-   - dispatchers / app responders -> WebSocket
-   - feature-phone responders     -> SMS (recorded in a sink for the demo)
-
-Postgres: incidents, responders, hospitals, assignments, event log
-Redis:    responder GEO positions, USSD session state, the SMS-out sink
-Prometheus + Grafana for metrics
+[Web/Mobile App]   [USSD Menu (*920#)]   [SMS (e.g. "MED collapsed")]
+       │                    │                     │
+       └──────────┬─────────┴─────────────────────┘
+                  ▼
+         [FastAPI Ingestion] (Input normalization & validation)
+                  │
+                  ▼
+         [RabbitMQ Bus] (Priority-ordered queues based on severity)
+                  │
+                  ▼
+         [Dispatch Engine]
+          ├── Redis GEO (Nearest available responder query)
+          └── Postgres (Hospital specialty & bed capacity check)
+                  │
+                  ▼
+         [Notification Engine] ──> WebSocket (App) or SMS (Feature phone)
 ```
 
-A report comes in through the FastAPI ingestion layer, which validates it, saves
-the incident, and publishes an event to RabbitMQ without making the reporter wait
-on dispatch. I picked RabbitMQ mainly for its priority queues: triage severity
-maps straight onto message priority, so a cardiac arrest is pulled off the queue
-before a minor injury that was already waiting (there's a test that proves this).
-Kafka would have been overkill here; its strength is high-throughput replay, which
-I list as a possible extension rather than something this needs.
+### Core Features
 
-The dispatch engine consumes those events, finds the nearest available responder
-with Redis GEO, reserves a hospital bed for medical cases, writes the assignment,
-and emits an `incident.assigned` event. Matching locks the responder row it claims
-so two incidents arriving at once can't grab the same ambulance. The notification
-service then fans the assignment out on whatever channel each party can reach: a
-live WebSocket push for dispatchers, an SMS for a responder carrying a feature
-phone. Every state change is written to an append-only event log.
+* **Multi-Channel Ingestion & Normalization**: Normalizes inputs ranging from rich WebSocket payloads (GPS coordinates, image URLs) to basic USSD callback sequences and keyword-parsed SMS text into a unified `IncidentEvent` model.
+* **Triage Severity Queuing**: Utilizes **RabbitMQ priority queues** (via `aio-pika`) to ensure critical, life-threatening incidents (e.g., cardiac arrest) automatically bypass standard tickets.
+* **Geospatial Responder Matching**: Employs **Redis GEO** commands for low-latency, real-time proximity lookups to match the closest available responder of the required type.
+* **Hospital Capacity Locking**: Checks capabilities and reserves bed space in **PostgreSQL** (using SQLAlchemy 2.0 and asyncpg) under database transactions designed to prevent double-booking under high concurrency.
+* **Resilient Outbound Notifications**: Directs dispatch alerts to responders through whichever channel they can reach (WebSocket push for mobile apps, or SMS for basic GSM feature phones).
+* **Local Provider Simulator**: Includes a mock gateway integration that mimics the Africa's Talking callback contract, allowing local testing of USSD session navigation (`*920#`) and SMS handling.
 
-## Stack
+---
 
-- FastAPI (async Python) for the API and WebSockets
-- RabbitMQ via aio-pika for the priority event bus
-- PostgreSQL with SQLAlchemy 2.0 async + asyncpg, migrations with Alembic
-- Redis for responder geo positions, USSD session state, and the SMS sink
-- JWT auth with access + refresh-token rotation
-- Prometheus and Grafana for metrics
-- structlog for JSON logging, pydantic-settings for config
-- Docker Compose to run the whole thing
+## Tech Stack
 
-## Running it
+* **API & Core Logic**: FastAPI (Asynchronous Python)
+* **Message Broker**: RabbitMQ (using native priority queues)
+* **Database**: PostgreSQL (SQLAlchemy 2.0 Async + Alembic)
+* **Cache & Geo-indexing**: Redis (GEO commands & USSD state machine)
+* **Auth**: JWT (with access and refresh token rotation)
+* **Observability**: Prometheus & Grafana (real-time metrics dashboard)
+* **Containerization**: Docker & Docker Compose
 
-You need Docker. A GitHub Codespace is the easiest way since it comes with Docker
-and the right Python; local Docker works the same.
+---
 
+## Getting Started
+
+### Prerequisites
+* Docker and Docker Compose
+
+### 1. Environment Setup
+Clone the repository and copy the example environment configuration:
 ```bash
-cp .env.example .env          # then set SECRET_KEY to something random
-docker compose up -d --build  # postgres, redis, rabbitmq, app, prometheus, grafana
+cp .env.example .env
+```
+*(Open `.env` and set a secure, random string for `SECRET_KEY`)*
 
+### 2. Boot Services
+Spin up the PostgreSQL, Redis, RabbitMQ, FastAPI, Prometheus, and Grafana containers:
+```bash
+docker compose up -d --build
+```
+
+### 3. Initialize Database & Seed Data
+Generate database migrations and apply them to construct the schema, then seed the database with mock responders, hospitals, and dispatch credentials:
+```bash
 docker compose exec app alembic revision --autogenerate -m "initial schema"
 docker compose exec app alembic upgrade head
-docker compose exec app python seed.py   # demo responders, hospitals, a dispatcher
+docker compose exec app python seed.py
 ```
 
-Then:
+### 4. Run Tests
+Verify the entire backend functionality and priority dispatch queue logic:
+```bash
+docker compose exec app pytest -q
+```
 
-- Demo console: http://localhost:8000/sim/
-- API docs: http://localhost:8000/docs
-- Grafana: http://localhost:3000 (admin / admin), the "Beacon" dashboard
-- RabbitMQ: http://localhost:15672 (beacon / beacon)
+---
 
-The seeded dispatcher login is `dispatcher@beacon.local` / `beacon-dispatch`.
+## Interactive Simulation Dashboard
 
-Run the tests with `docker compose exec app pytest -q`. They cover the channel
-normalisation, the USSD menu walk including abandonment and timeout, SMS parsing,
-the priority ordering, responder and hospital matching, the no-responder case, and
-the notification fan-out.
+To test the system without a live carrier gateway, open the simulator console in your browser:
+👉 **[http://localhost:8000/sim/](http://localhost:8000/sim/)**
 
-## The demo
+The dashboard provides four panels to simulate realistic user and responder flows:
+* **USSD Dialer**: Simulates dialing `*920#` on a feature phone and walking through the menu state machine.
+* **Inbound SMS**: Sends custom SMS alerts (e.g., `MED collapsed at Osu`) to verify keyword-based ingestion.
+* **Dispatcher Feed**: Displays live assignments and status transitions via WebSockets.
+* **Outbound SMS**: Logs outgoing SMS alerts sent to responders who do not have internet connectivity.
 
-Open the console at `/sim/`. It's one page with four panes. Dial `*920#` on the
-USSD pane as if you were on a feature phone with no data, and walk the menu:
-pick a type, type a location, confirm. The incident gets saved, published at a
-priority matching its severity, and dispatched to the nearest available responder.
-The dispatcher feed on the right shows the assignment arrive live over WebSocket,
-and if the responder is on a feature phone the outbound SMS pane shows exactly what
-they would have been texted. Sending an SMS like `MED collapsed at Osu` runs the
-same pipeline. The Grafana dashboard shows incidents by channel, dispatch latency,
-available responders, and notification outcomes as you go.
+### Port & Credential Reference
+* **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
+* **Grafana Dashboard**: [http://localhost:3000](http://localhost:3000) (Credentials: `admin` / `admin`)
+* **RabbitMQ Console**: [http://localhost:15672](http://localhost:15672) (Credentials: `beacon` / `beacon`)
+* **Seeded Dispatcher**: `dispatcher@beacon.local` / `beacon-dispatch`
 
-Demo video: _link coming soon_
+---
 
-## What I'd do next
+## Project Roadmap
 
-- Replay the full timeline of an incident from the event log (this is where Kafka
-  would earn its place).
-- Real geocoding instead of the small area lookup I use to place USSD/SMS reports.
-- Predict severity from the report text.
-- Wire the simulator to a real Africa's Talking account.
-- Broadcast WebSocket events across multiple workers with Redis pub/sub.
+Future enhancements for the platform include:
+* **Incident Timeline Replay**: Implementing event sourcing / append-only replay logs to reconstruct incident timelines for post-event audit.
+* **Geocoding API Integration**: Integrating an external geocoding API to parse natural-language SMS/USSD locations into GPS coordinates.
+* **Production Gateway Hook**: Directing incoming webhooks to live telecom gateway sandboxes.
+* **Horizontal WebSocket Scaling**: Integrating Redis Pub/Sub to sync WebSocket events across multiple backend app instances.
+
+---
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
