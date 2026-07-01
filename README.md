@@ -103,6 +103,12 @@ The dashboard provides four panels to simulate realistic user and responder flow
 
 ---
 
+## AWS Pilot Deployment
+
+For a controlled production pilot on AWS, use the Terraform and deployment scripts under `infra/aws` and `scripts/aws`. The full operational runbook is in [docs/production/aws.md](docs/production/aws.md).
+
+---
+
 ## Project Roadmap
 
 Future enhancements for the platform include:

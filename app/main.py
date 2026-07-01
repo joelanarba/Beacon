@@ -13,6 +13,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Response
+from fastapi.middleware.cors import CORSMiddleware
 
 from auth.middleware import AuthMiddleware
 from auth.router import router as auth_router
@@ -31,6 +32,7 @@ from utils.logging import configure_logging, get_logger
 
 configure_logging()
 log = get_logger("beacon")
+settings = get_settings()
 
 
 @asynccontextmanager
@@ -66,13 +68,29 @@ async def lifespan(app: FastAPI):
     log.info("beacon.shutdown")
 
 
-app = FastAPI(title="Beacon", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="Beacon",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/docs" if settings.docs_enabled else None,
+    redoc_url="/redoc" if settings.docs_enabled else None,
+    openapi_url="/openapi.json" if settings.docs_enabled else None,
+)
+if settings.cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 app.add_middleware(AuthMiddleware)
 app.include_router(auth_router)
 app.include_router(ingestion_router)
 app.include_router(incidents_router)
 app.include_router(realtime_router)
-app.include_router(sim_router)
+if settings.simulator_enabled:
+    app.include_router(sim_router)
 
 
 @app.get("/health", tags=["meta"])

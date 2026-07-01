@@ -1,0 +1,6 @@
+[tool.ruff.lint]
+ignore = [
+  # The codebase intentionally uses str-backed enums for Pydantic/SQLAlchemy
+  # compatibility across the current models and API schemas.
+  "UP042",
+]

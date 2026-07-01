@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from channels.base import Severity
@@ -25,6 +26,11 @@ class Settings(BaseSettings):
 
     environment: str = "development"
     secret_key: str = "dev-insecure-change-me"
+    docs_enabled: bool = True
+    simulator_enabled: bool = True
+    metrics_public: bool = True
+    cors_allowed_origins: str = ""
+    ingest_shared_secret: str = ""
 
     # Infrastructure connections (defaults match docker-compose service names).
     database_url: str = "postgresql+asyncpg://beacon:beacon@postgres:5432/beacon"
@@ -46,6 +52,23 @@ class Settings(BaseSettings):
     # Event bus (RabbitMQ).
     event_exchange: str = "beacon.events"
     max_queue_priority: int = 10
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> Settings:
+        if self.environment.lower() == "production":
+            if self.secret_key == "dev-insecure-change-me" or len(self.secret_key) < 32:
+                raise ValueError(
+                    "SECRET_KEY must be set to a strong random value in production"
+                )
+        return self
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [
+            origin.strip()
+            for origin in self.cors_allowed_origins.split(",")
+            if origin.strip()
+        ]
 
     @property
     def severity_priorities(self) -> dict[str, int]:

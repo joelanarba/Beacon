@@ -10,6 +10,7 @@ import uuid
 from pytest import approx
 from sqlalchemy import func, select
 
+from config import get_settings
 from models.db import Incident
 from sim.provider import OUTBOX_KEY, SimulatedSmsProvider, read_outbox
 from utils.redis import make_redis
@@ -50,6 +51,22 @@ async def test_ingest_app_persists_incident(client, db_session):
     ).scalar_one()
     assert row.source_channel.value == "APP"
     assert row.latitude == approx(5.56)
+
+
+async def test_ingest_secret_rejects_missing_header(client, monkeypatch):
+    monkeypatch.setenv("INGEST_SHARED_SECRET", "provider-secret")
+    get_settings.cache_clear()
+    try:
+        resp = await client.post(
+            "/ingest/app",
+            json={
+                "emergency_type": "MEDICAL",
+                "description": "cardiac arrest",
+            },
+        )
+        assert resp.status_code == 401
+    finally:
+        get_settings.cache_clear()
 
 
 # --------------------------------------------------------------------------- #

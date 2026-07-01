@@ -19,8 +19,10 @@ to the bus fire-and-forget — never blocking the reporter on dispatch.
 
 from __future__ import annotations
 
+import hmac
+
 import redis.asyncio as redis
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from fastapi.responses import PlainTextResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,7 +39,21 @@ from utils.logging import get_logger
 from utils.redis import get_redis
 
 log = get_logger("beacon.ingestion")
-router = APIRouter(prefix="/ingest", tags=["ingestion"])
+
+
+async def require_ingest_secret(
+    x_beacon_ingest_secret: str | None = Header(default=None),
+) -> None:
+    expected = get_settings().ingest_shared_secret
+    if expected and not hmac.compare_digest(x_beacon_ingest_secret or "", expected):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid ingest secret"
+        )
+
+
+router = APIRouter(
+    prefix="/ingest", tags=["ingestion"], dependencies=[Depends(require_ingest_secret)]
+)
 
 # Channel adapters are stateless (per-session state lives in Redis, not here).
 _app = AppChannel()
