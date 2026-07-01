@@ -1,9 +1,10 @@
 """AuthMiddleware — stateless access-token gate.
 
-Every request must carry a valid ``Bearer`` *access* token, except the open
-allowlist: health, metrics, API docs, the login/refresh/logout endpoints, and
-the ingestion channels (open by design, since a reporter on USSD/SMS cannot
-authenticate). On success the decoded identity is attached to
+Every request must carry a valid ``Bearer`` *access* token, except the configured
+open allowlist: health, auth endpoints, and the ingestion channels (open by
+design, since a reporter on USSD/SMS cannot authenticate). Development-only
+surfaces such as docs, metrics, and the simulator are opened only when their
+settings allow it. On success the decoded identity is attached to
 ``request.state.user`` for downstream handlers.
 """
 
@@ -15,23 +16,27 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from auth.security import AuthPrincipal, decode_token
+from config import get_settings
 
-_OPEN_PREFIXES = (
+_ALWAYS_OPEN_PREFIXES = (
     "/health",
-    "/metrics",
-    "/docs",
-    "/redoc",
-    "/openapi.json",
     "/auth/login",
     "/auth/refresh",
     "/auth/logout",
     "/ingest",
-    "/sim",
 )
 
 
 def _is_open(path: str) -> bool:
-    return any(path == p or path.startswith(p + "/") for p in _OPEN_PREFIXES)
+    settings = get_settings()
+    prefixes = list(_ALWAYS_OPEN_PREFIXES)
+    if settings.docs_enabled:
+        prefixes.extend(("/docs", "/redoc", "/openapi.json"))
+    if settings.metrics_public:
+        prefixes.append("/metrics")
+    if settings.simulator_enabled:
+        prefixes.append("/sim")
+    return any(path == p or path.startswith(p + "/") for p in prefixes)
 
 
 class AuthMiddleware(BaseHTTPMiddleware):

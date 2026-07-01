@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: beacon
+          POSTGRES_PASSWORD: beacon
+          POSTGRES_DB: beacon
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U beacon"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7.2-alpine
+        ports:
+          - 6379:6379
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        env:
+          RABBITMQ_DEFAULT_USER: beacon
+          RABBITMQ_DEFAULT_PASS: beacon
+        ports:
+          - 5672:5672
+
+    env:
+      ENVIRONMENT: test
+      SECRET_KEY: ci-secret-key-with-at-least-thirty-two-characters
+      DATABASE_URL: postgresql+asyncpg://beacon:beacon@localhost:5432/beacon
+      REDIS_URL: redis://localhost:6379
+      AMQP_URL: amqp://beacon:beacon@localhost:5672/
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: app
+        run: pip install -r requirements.txt
+
+      - name: Lint
+        working-directory: app
+        run: ruff check .
+
+      - name: Test
+        working-directory: app
+        run: pytest -q

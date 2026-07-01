@@ -1,0 +1,24 @@
+project_name = "beacon"
+environment  = "staging"
+aws_region   = "us-east-1"
+
+# Bootstrap ECR first, push an image, then set this to the pushed image URI.
+app_image = "123456789012.dkr.ecr.us-east-1.amazonaws.com/beacon-staging:latest"
+
+# Optional custom domain. Leave empty to use the ALB DNS name.
+domain_name     = "api.example.com"
+route53_zone_id = "Z00000000000000000000"
+certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000"
+
+secret_key          = "replace-with-at-least-32-random-characters"
+db_username         = "beacon"
+db_password         = "replace-with-a-strong-db-password"
+rabbitmq_username   = "beacon"
+rabbitmq_password   = "replace-with-a-strong-rabbitmq-password"
+cors_allowed_origins = "https://dispatcher.example.com"
+ingest_shared_secret = "replace-with-provider-callback-shared-secret"
+
+docs_enabled      = false
+simulator_enabled = false
+metrics_public    = false
+desired_count     = 2

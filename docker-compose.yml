@@ -9,8 +9,6 @@ services:
     env_file: .env
     ports:
       - "8000:8000"
-    volumes:
-      - ./app:/app
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,8 +34,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-beacon}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beacon}
       POSTGRES_DB: ${POSTGRES_DB:-beacon}
-    ports:
-      - "5432:5432"
     volumes:
       - beacon-pg:/var/lib/postgresql/data
     networks:
@@ -53,8 +49,6 @@ services:
     container_name: beacon-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
-    ports:
-      - "6379:6379"
     volumes:
       - beacon-redis:/data
     networks:
@@ -72,9 +66,6 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-beacon}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-beacon}
-    ports:
-      - "5672:5672"     # AMQP
-      - "15672:15672"   # management UI
     volumes:
       - beacon-rabbitmq:/var/lib/rabbitmq
     networks:
@@ -89,8 +80,6 @@ services:
     image: prom/prometheus:v2.51.0
     container_name: beacon-prometheus
     restart: unless-stopped
-    ports:
-      - "9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - beacon-prom:/prometheus
@@ -101,8 +90,6 @@ services:
     image: grafana/grafana:10.4.0
     container_name: beacon-grafana
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
