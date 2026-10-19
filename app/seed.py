@@ -93,7 +93,7 @@ _HOSPITALS = [
     ("Ridge Hospital", 5.5650, -0.1969, 80, 12, ["GENERAL", "MATERNITY"]),
 ]
 
-_DISPATCHER_EMAIL = "dispatcher@beacon.local"
+_DISPATCHER_EMAIL = "dispatcher@example.com"
 _DISPATCHER_PASSWORD = "beacon-dispatch"
 
 

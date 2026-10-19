@@ -7,11 +7,10 @@ Design notes:
 - Primary keys are UUIDs (matching ``IncidentEvent.incident_id``), except
   ``EventLog`` which uses an autoincrement BigInteger for natural append-order
   (the audit/replay dataset).
-- Enum columns render as VARCHAR + CHECK (``native_enum=False``) to keep
-  migrations simple.
+- Enum values use VARCHAR columns; the versioned migrations define their checks.
 - A ``Responder`` has no lat/lng here; its live position lives in Redis GEO.
   ``Hospital`` has a fixed location, and an ``Incident`` may have one.
-- ``NullPool`` is used under pytest (lessons.md) so tests don't leak
+- ``NullPool`` is used under pytest so tests don't leak
   connections across event loops.
 """
 
@@ -26,13 +25,17 @@ from enum import Enum
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    CheckConstraint,
     DateTime,
     Float,
     ForeignKey,
     Integer,
+    Index,
+    LargeBinary,
     String,
     Text,
     Uuid,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy import (
@@ -115,6 +118,8 @@ class Incident(Base):
     )
     source_channel: Mapped[ChannelKind] = mapped_column(_enum_col(ChannelKind))
     description: Mapped[str] = mapped_column(Text, default="")
+    ingest_key: Mapped[str | None] = mapped_column(String(64), unique=True)
+    request_hash: Mapped[str | None] = mapped_column(String(64))
 
     latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -151,6 +156,13 @@ class Responder(Base):
 
 class Hospital(Base):
     __tablename__ = "hospitals"
+    __table_args__ = (
+        CheckConstraint(
+            "total_capacity >= 0 AND available_capacity >= 0 "
+            "AND available_capacity <= total_capacity",
+            name="ck_hospitals_capacity",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(
         Uuid(as_uuid=False), primary_key=True, default=_uuid_str
@@ -170,6 +182,7 @@ class Hospital(Base):
 
 class Assignment(Base):
     __tablename__ = "assignments"
+    __table_args__ = (UniqueConstraint("incident_id", name="uq_assignment_incident"),)
 
     id: Mapped[str] = mapped_column(
         Uuid(as_uuid=False), primary_key=True, default=_uuid_str
@@ -186,10 +199,70 @@ class Assignment(Base):
     assigned_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+Index(
+    "uq_assignment_active_responder",
+    Assignment.responder_id,
+    unique=True,
+    postgresql_where=Assignment.released_at.is_(None),
+)
+
+
+class EventOutbox(Base):
+    """Durable publication intent, committed with the corresponding state change."""
+
+    __tablename__ = "event_outbox"
+    __table_args__ = (
+        UniqueConstraint("event_id", "delivery_attempt", name="uq_outbox_delivery"),
+        CheckConstraint("delivery_attempt >= 0", name="ck_outbox_attempt"),
+        Index("ix_outbox_pending", "published_at", "available_at"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False), primary_key=True, default=_uuid_str
+    )
+    event_id: Mapped[str] = mapped_column(String(200))
+    routing_key: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    delivery_attempt: Mapped[int] = mapped_column(Integer, default=0)
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    publish_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(String(128))
+
+
+class DeadLetter(Base):
+    """Terminal consumer failure; retained for inspection rather than discarded."""
+
+    __tablename__ = "dead_letters"
+    __table_args__ = (
+        UniqueConstraint("consumer", "event_id", name="uq_dead_letter_event"),
+    )
+
+    id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False), primary_key=True, default=_uuid_str
+    )
+    consumer: Mapped[str] = mapped_column(String(32))
+    event_id: Mapped[str] = mapped_column(String(200))
+    routing_key: Mapped[str] = mapped_column(String(64))
+    body: Mapped[bytes] = mapped_column(LargeBinary)
+    delivery_attempt: Mapped[int] = mapped_column(Integer)
+    error_type: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class EventLog(Base):
-    """Append-only audit of every state transition (paper dataset / replay)."""
+    """Application audit records for incident acceptance and state transitions."""
 
     __tablename__ = "event_log"
 

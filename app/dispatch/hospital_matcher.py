@@ -36,18 +36,25 @@ async def match_hospital(
     if required_specialty:
         # 'specialty' = ANY(hospitals.specialties)
         stmt = stmt.where(Hospital.specialties.any(required_specialty))
-    # Lock candidates and skip any a concurrent dispatcher is reserving, so the
-    # last bed at a hospital can't be double-booked.
-    stmt = stmt.with_for_update(skip_locked=True)
-
     candidates = (await db.execute(stmt)).scalars().all()
-    if not candidates:
-        return None
-
-    chosen = min(
+    ranked = sorted(
         candidates,
         key=lambda h: haversine_m(latitude, longitude, h.latitude, h.longitude),
     )
-    distance = haversine_m(latitude, longitude, chosen.latitude, chosen.longitude)
-    chosen.available_capacity -= 1  # reserve the bed
-    return HospitalMatch(hospital=chosen, distance_m=distance)
+    for candidate in ranked:
+        # Recheck eligibility after acquiring only this candidate's lock. A
+        # different reservation may have consumed capacity since the ranking read.
+        chosen = (
+            await db.execute(
+                stmt.where(Hospital.id == candidate.id)
+                .with_for_update(skip_locked=True)
+                .execution_options(populate_existing=True)
+            )
+        ).scalar_one_or_none()
+        if chosen is not None:
+            distance = haversine_m(
+                latitude, longitude, chosen.latitude, chosen.longitude
+            )
+            chosen.available_capacity -= 1
+            return HospitalMatch(hospital=chosen, distance_m=distance)
+    return None

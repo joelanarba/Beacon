@@ -43,7 +43,7 @@ async def _incident(db_session, status):
 
 
 async def test_advance_status_to_en_route(client, db_session):
-    token = await _dispatcher_token(client, db_session, "dispatch4a@test.local")
+    token = await _dispatcher_token(client, db_session, "dispatch4a@example.com")
     incident = await _incident(db_session, IncidentStatus.ASSIGNED)
 
     resp = await client.post(
@@ -67,7 +67,7 @@ async def test_advance_status_to_en_route(client, db_session):
 
 
 async def test_advance_status_rejects_invalid_target(client, db_session):
-    token = await _dispatcher_token(client, db_session, "dispatch4b@test.local")
+    token = await _dispatcher_token(client, db_session, "dispatch4b@example.com")
     incident = await _incident(db_session, IncidentStatus.REPORTED)
 
     resp = await client.post(

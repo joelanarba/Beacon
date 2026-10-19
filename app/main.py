@@ -1,16 +1,14 @@
-"""Beacon FastAPI application.
+"""Beacon API with a supervised broker/outbox worker.
 
-Boots the API and wires structlog + ``AuthMiddleware`` + every router (auth,
-ingestion, incidents, realtime WS, simulator). The lifespan connects the RabbitMQ
-bus and starts the background consumers (dispatch + notification), holding strong
-references on ``app.state`` and closing the bus cleanly on shutdown. Boot is
-resilient: if the broker is down the API still serves ``/health``, ``/metrics``,
-and ingestion (incidents persist) — they just won't dispatch until it returns.
+Ingestion requires PostgreSQL, but does not wait for RabbitMQ. Accepted reports
+and their dispatch events commit together. /health is liveness; /ready checks
+broker setup, the outbox schema, and Redis connectivity.
 """
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,17 +16,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from auth.middleware import AuthMiddleware
 from auth.router import router as auth_router
 from config import get_settings
-from dispatch.engine import refresh_active_responders, start_dispatch_consumer
-from events.bus import EventBus
+from dispatch.engine import refresh_active_responders
+from events.worker import run_event_worker
 from incidents.api import router as incidents_router
 from ingestion.api import router as ingestion_router
-from models.db import async_session
-from notification.notifier import start_notification_consumer
+from models.db import EventOutbox, async_session, engine
+from sqlalchemy import select
 from realtime.hub import hub
 from realtime.hub import router as realtime_router
 from sim.provider import router as sim_router
 from utils import metrics
 from utils.logging import configure_logging, get_logger
+from utils.redis import make_redis
 
 configure_logging()
 log = get_logger("beacon")
@@ -38,33 +37,26 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("beacon.startup")
-    settings = get_settings()
     app.state.bus = None
-    # Connect the bus and start the dispatch consumer. Boot stays resilient: if
-    # the broker is briefly unavailable the API still serves /health and ingestion
-    # (incidents persist) — they just won't dispatch until the bus is back.
-    try:
-        bus = EventBus(
-            settings.amqp_url, settings.event_exchange, settings.max_queue_priority
-        )
-        await bus.connect()
-        app.state.bus = bus
-        app.state.dispatch_queue = await start_dispatch_consumer(bus)
-        app.state.notify_queue = await start_notification_consumer(bus, hub)
-        log.info("beacon.bus_ready")
-    except Exception as exc:  # noqa: BLE001 — degrade, don't crash the API
-        log.error("beacon.bus_unavailable", error=str(exc))
+    stop = asyncio.Event()
+    worker = asyncio.create_task(run_event_worker(app, hub, stop))
+    app.state.event_worker = worker
     # Seed the active-responders gauge so the dashboard has data before the first
     # dispatch (best-effort: a DB hiccup must not block boot).
     try:
-        async with async_session() as db:
-            await refresh_active_responders(db)
+        async with asyncio.timeout(settings.broker_timeout_seconds):
+            async with async_session() as db:
+                await refresh_active_responders(db)
     except Exception as exc:  # noqa: BLE001
         log.warning("beacon.gauge_init_failed", error=str(exc))
-    yield
-    bus = getattr(app.state, "bus", None)
-    if bus is not None:
-        await bus.close()
+    try:
+        yield
+    finally:
+        stop.set()
+        worker.cancel()
+        with suppress(asyncio.CancelledError):
+            await worker
+        await engine.dispose()
     log.info("beacon.shutdown")
 
 
@@ -96,6 +88,26 @@ if settings.simulator_enabled:
 @app.get("/health", tags=["meta"])
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/ready", tags=["meta"])
+async def ready(response: Response) -> dict[str, str]:
+    bus = getattr(app.state, "bus", None)
+    if bus is not None and bus.is_ready:
+        try:
+            async with asyncio.timeout(get_settings().broker_timeout_seconds):
+                async with async_session() as session:
+                    await session.execute(select(EventOutbox.id).limit(1))
+                rc = make_redis()
+                try:
+                    await rc.ping()
+                finally:
+                    await rc.aclose()
+            return {"status": "ready"}
+        except Exception:
+            pass
+    response.status_code = 503
+    return {"status": "not_ready"}
 
 
 @app.get("/metrics", tags=["meta"])

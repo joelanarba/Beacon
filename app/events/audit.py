@@ -1,9 +1,8 @@
 """Append-only audit trail.
 
-Every incident state transition writes one ``EventLog`` row — the dataset that
-powers the dispatcher activity feed and the Grafana timeline. Payloads must be
-JSON-safe (primitives / strings), since the column is JSONB; serialise datetimes
-to ISO strings before passing them in.
+Acceptance and lifecycle updates write ``EventLog`` rows in their database
+transactions. Payloads must be JSON-safe because the column is JSONB; serialize
+datetimes to ISO strings before passing them in. The caller owns the commit.
 """
 
 from __future__ import annotations

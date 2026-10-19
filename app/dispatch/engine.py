@@ -3,12 +3,9 @@
 The engine is channel-agnostic: it consumes the normalised ``IncidentReported``
 event and never asks which channel it came from (except to label the latency
 metric). The matching/persistence core is factored into ``dispatch_incident`` so
-it is unit-testable without RabbitMQ; the consumer is a thin wrapper that
-deserialises a message, calls the core, and publishes ``incident.assigned``.
-
-On every state transition we append an ``EventLog`` row. The no-responder path is
-handled gracefully — logged, audited, and the incident stays ``REPORTED`` for a
-later retry — never a crash.
+it can be tested without RabbitMQ. Assignment changes and their outbound event
+commit together. Incident row locking and assignment constraints make redelivery
+idempotent. Resource shortages use bounded durable retry, then dead-letter storage.
 """
 
 from __future__ import annotations
@@ -27,6 +24,7 @@ from dispatch.responder_matcher import RESPONDERS_GEO_KEY, match_nearest
 from dispatch.triage import needs_hospital, severity_to_priority
 from events.audit import record_event_log
 from events.bus import EventBus
+from events.outbox import RetryableDeliveryError, consume_reliably, enqueue_event
 from events.schemas import (
     RK_ASSIGNED,
     RK_REPORTED,
@@ -55,6 +53,7 @@ _MEDICAL_SPECIALTY = "TRAUMA"
 @dataclass
 class DispatchOutcome:
     assigned: bool
+    retryable: bool = False
     assignment_id: str | None = None
     responder_id: str | None = None
     hospital_id: str | None = None
@@ -85,6 +84,20 @@ async def dispatch_incident(
 ) -> DispatchOutcome:
     """Match + assign a reported incident. Pure of the bus, so it unit-tests."""
     settings = get_settings()
+    incident = (
+        await db.execute(
+            select(Incident)
+            .where(Incident.id == payload.incident_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+    if incident is None:
+        raise ValueError("Unknown incident")
+    if incident.status != IncidentStatus.REPORTED:
+        await db.commit()
+        return DispatchOutcome(assigned=False)
+
     lat, lng = resolve_location(payload.latitude, payload.longitude, payload.area_label)
 
     match = await match_nearest(
@@ -114,7 +127,7 @@ async def dispatch_incident(
             incident_id=payload.incident_id,
             emergency_type=payload.emergency_type.value,
         )
-        return DispatchOutcome(assigned=False)
+        return DispatchOutcome(assigned=False, retryable=True)
 
     responder = match.responder
 
@@ -124,8 +137,11 @@ async def dispatch_incident(
             db, latitude=lat, longitude=lng, required_specialty=_MEDICAL_SPECIALTY
         )
         hospital = hospital_match.hospital if hospital_match else None
+        if hospital is None:
+            await record_event_log(db, payload.incident_id, "dispatch.no_hospital")
+            await db.commit()
+            return DispatchOutcome(assigned=False, retryable=True)
 
-    incident = await db.get(Incident, payload.incident_id)
     assignment = Assignment(
         incident_id=payload.incident_id,
         responder_id=responder.id,
@@ -133,8 +149,7 @@ async def dispatch_incident(
     )
     db.add(assignment)
     responder.status = ResponderStatus.ASSIGNED
-    if incident is not None:
-        incident.status = IncidentStatus.ASSIGNED
+    incident.status = IncidentStatus.ASSIGNED
 
     await record_event_log(
         db,
@@ -146,16 +161,6 @@ async def dispatch_incident(
             "match_radius_m": round(match.distance_m, 1),
         },
     )
-    await db.commit()
-
-    # Metrics (post-commit; process-wide collectors).
-    latency_s = (datetime.now(UTC) - payload.reported_at).total_seconds()
-    metrics.dispatch_latency_seconds.labels(
-        source_channel=payload.source_channel.value
-    ).observe(max(0.0, latency_s))
-    metrics.match_radius_meters.observe(match.distance_m)
-    await refresh_active_responders(db)
-
     assigned_event = IncidentAssigned(
         incident_id=payload.incident_id,
         responder_id=responder.id,
@@ -168,6 +173,24 @@ async def dispatch_incident(
         severity=payload.severity,
         match_radius_m=match.distance_m,
     )
+    await enqueue_event(
+        db,
+        RK_ASSIGNED,
+        assigned_event,
+        event_id=f"{RK_ASSIGNED}:{payload.incident_id}",
+        priority=severity_to_priority(payload.severity),
+    )
+    await db.commit()
+
+    latency_s = (datetime.now(UTC) - payload.reported_at).total_seconds()
+    metrics.dispatch_latency_seconds.labels(
+        source_channel=payload.source_channel.value
+    ).observe(max(0.0, latency_s))
+    metrics.match_radius_meters.observe(match.distance_m)
+    try:
+        await refresh_active_responders(db)
+    except Exception as exc:
+        log.warning("dispatch.gauge_refresh_failed", error_type=type(exc).__name__)
     log.info(
         "dispatch.assigned",
         incident_id=payload.incident_id,
@@ -187,7 +210,7 @@ async def dispatch_incident(
 
 def _make_handler(bus: EventBus):
     async def handler(message: aio_pika.abc.AbstractIncomingMessage) -> None:
-        async with message.process(requeue=False):
+        async def process() -> None:
             payload = IncidentReported.model_validate_json(message.body)
             redis = make_redis()
             try:
@@ -195,21 +218,10 @@ def _make_handler(bus: EventBus):
                     outcome = await dispatch_incident(db, redis, payload)
             finally:
                 await redis.aclose()
-            if outcome.assigned and outcome.assigned_event is not None:
-                # The assignment is already committed; a broker hiccup here must
-                # not reject the message and re-dispatch. Log and move on.
-                try:
-                    await bus.publish(
-                        RK_ASSIGNED,
-                        outcome.assigned_event,
-                        priority=severity_to_priority(payload.severity),
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    log.error(
-                        "dispatch.assigned_publish_failed",
-                        incident_id=payload.incident_id,
-                        error=str(exc),
-                    )
+            if outcome.retryable:
+                raise RetryableDeliveryError("Dispatch resources unavailable")
+
+        await consume_reliably(message, "dispatch", process)
 
     return handler
 

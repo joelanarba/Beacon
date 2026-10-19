@@ -20,6 +20,7 @@ from config import get_settings
 
 _ALWAYS_OPEN_PREFIXES = (
     "/health",
+    "/ready",
     "/auth/login",
     "/auth/refresh",
     "/auth/logout",

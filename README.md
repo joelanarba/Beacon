@@ -1,6 +1,8 @@
 # Beacon — Resilient Emergency Coordination Backend
 
-Beacon is a resilient, multi-channel emergency coordination system designed to maintain service reliability across a connectivity gradient. In critical situations where mobile data connections are unavailable or drop, Beacon utilizes GSM signaling (SMS and USSD) to ensure emergency incident reports are successfully ingested, prioritized, and dispatched to responders and healthcare facilities.
+Beacon is an emergency-coordination backend prototype. It normalizes app, SMS, and USSD reports, processes dispatch through RabbitMQ, and stores incidents and assignments in PostgreSQL. SMS and USSD use simulated provider callbacks; outbound SMS is recorded in a Redis simulator sink. Live telecom integration and production operation have not been verified.
+
+Incident acceptance, assignment, and lifecycle updates now use a transactional outbox. Database constraints and row locks guard duplicate assignments and resource release. Delivery is subject to the guarantees and remaining limitations in [docs/RELIABILITY.md](docs/RELIABILITY.md); no exactly-once delivery or measured performance claim is made.
 
 ---
 
@@ -29,11 +31,11 @@ Beacon's ingestion pipeline normalizes inbound reports from multiple channels in
 
 ### Core Features
 
-* **Multi-Channel Ingestion & Normalization**: Normalizes inputs ranging from rich WebSocket payloads (GPS coordinates, image URLs) to basic USSD callback sequences and keyword-parsed SMS text into a unified `IncidentEvent` model.
-* **Triage Severity Queuing**: Utilizes **RabbitMQ priority queues** (via `aio-pika`) to ensure critical, life-threatening incidents (e.g., cardiac arrest) automatically bypass standard tickets.
+* **Multi-Channel Ingestion & Normalization**: Normalizes HTTP app payloads (GPS coordinates, image URLs), simulated USSD callback sequences, and keyword-parsed SMS into a unified `IncidentEvent` model.
+* **Severity Queuing**: Sets RabbitMQ message priorities from the reported severity. Priority applies to messages waiting in the broker; prefetch and processing concurrency affect observed order. SMS/USSD use type-based defaults, not clinical text classification.
 * **Geospatial Responder Matching**: Employs **Redis GEO** commands for low-latency, real-time proximity lookups to match the closest available responder of the required type.
 * **Hospital Capacity Locking**: Checks capabilities and reserves bed space in **PostgreSQL** (using SQLAlchemy 2.0 and asyncpg) under database transactions designed to prevent double-booking under high concurrency.
-* **Resilient Outbound Notifications**: Directs dispatch alerts to responders through whichever channel they can reach (WebSocket push for mobile apps, or SMS for basic GSM feature phones).
+* **Outbound Notification Simulation**: Publishes dispatcher updates through a local WebSocket hub and records simulated SMS. SMS exceptions use durable retry/dead-letter storage. App responder delivery, reconnect replay, and multi-instance WebSocket fan-out remain incomplete.
 * **Local Provider Simulator**: Includes a mock gateway integration that mimics the Africa's Talking callback contract, allowing local testing of USSD session navigation (`*920#`) and SMS handling.
 
 ---
@@ -69,15 +71,14 @@ docker compose up -d --build
 ```
 
 ### 3. Initialize Database & Seed Data
-Generate database migrations and apply them to construct the schema, then seed the database with mock responders, hospitals, and dispatch credentials:
+Apply the versioned migrations, then seed mock responders, hospitals, and local dispatcher credentials:
 ```bash
-docker compose exec app alembic revision --autogenerate -m "initial schema"
 docker compose exec app alembic upgrade head
 docker compose exec app python seed.py
 ```
 
 ### 4. Run Tests
-Verify the entire backend functionality and priority dispatch queue logic:
+Run tests against explicitly configured disposable services as described in [docs/RELIABILITY.md](docs/RELIABILITY.md). With no test-service URLs configured, service-dependent tests are skipped:
 ```bash
 docker compose exec app pytest -q
 ```
@@ -87,7 +88,7 @@ docker compose exec app pytest -q
 ## Interactive Simulation Dashboard
 
 To test the system without a live carrier gateway, open the simulator console in your browser:
-👉 **[http://localhost:8000/sim/](http://localhost:8000/sim/)**
+**[http://localhost:8000/sim/](http://localhost:8000/sim/)**
 
 The dashboard provides four panels to simulate realistic user and responder flows:
 * **USSD Dialer**: Simulates dialing `*920#` on a feature phone and walking through the menu state machine.
@@ -99,7 +100,9 @@ The dashboard provides four panels to simulate realistic user and responder flow
 * **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 * **Grafana Dashboard**: [http://localhost:3000](http://localhost:3000) (Credentials: `admin` / `admin`)
 * **RabbitMQ Console**: [http://localhost:15672](http://localhost:15672) (Credentials: `beacon` / `beacon`)
-* **Seeded Dispatcher**: `dispatcher@beacon.local` / `beacon-dispatch`
+* **Seeded Dispatcher**: `dispatcher@example.com` / `beacon-dispatch` (local demonstration only)
+
+Only the app port is published by the tracked Compose file. Grafana and RabbitMQ console URLs require an explicit local port override; an ignored override on one developer's machine is not part of a clean checkout.
 
 ---
 

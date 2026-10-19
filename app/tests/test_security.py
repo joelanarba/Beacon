@@ -40,3 +40,11 @@ def test_tampered_token_rejected():
     token = create_access_token("user-123")
     with pytest.raises(JWTError):
         decode_token(token + "tampered")
+
+
+def test_seed_dispatcher_address_passes_login_validation():
+    from models.schemas import LoginRequest
+    from seed import _DISPATCHER_EMAIL
+
+    request = LoginRequest(email=_DISPATCHER_EMAIL, password="unused")
+    assert str(request.email) == _DISPATCHER_EMAIL

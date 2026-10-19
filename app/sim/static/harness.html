@@ -247,7 +247,7 @@
       try {
         const res = await fetch("/auth/login", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: "dispatcher@beacon.local", password: "beacon-dispatch" }),
+          body: JSON.stringify({ email: "dispatcher@example.com", password: "beacon-dispatch" }),
         });
         if (!res.ok) throw new Error("login " + res.status);
         token = (await res.json()).access_token;

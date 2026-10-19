@@ -21,7 +21,7 @@ from main import app
 from models.db import IncidentStatus, ReachableChannel
 from notification.notifier import notify_assignment, notify_status_change
 from realtime.hub import ROLE_DISPATCHER, ConnectionHub
-from sim.provider import OUTBOX_KEY, SimulatedSmsProvider, read_outbox
+from sim.provider import SimulatedSmsProvider, read_outbox
 from utils.redis import make_redis
 
 
@@ -83,14 +83,20 @@ async def test_dispatcher_receives_assignment_over_websocket():
     assert ws.sent[0]["responder_name"] == "Ambulance A1"
 
 
+@pytest.mark.redis
 async def test_sms_responder_gets_outbox_message():
     hub = ConnectionHub()
     rc = make_redis()
-    await rc.delete(OUTBOX_KEY)
+    key = f"test:sms:{uuid.uuid4().hex}"
     event = _assigned(ReachableChannel.SMS, "+233200000888")
-    await notify_assignment(event, hub=hub, provider=SimulatedSmsProvider(rc))
-    messages = await read_outbox(rc, 10)
-    await rc.aclose()
+    try:
+        await notify_assignment(
+            event, hub=hub, provider=SimulatedSmsProvider(rc, outbox_key=key)
+        )
+        messages = await read_outbox(rc, 10, outbox_key=key)
+    finally:
+        await rc.delete(key)
+        await rc.aclose()
     assert any(m["to"] == "+233200000888" for m in messages)
 
 

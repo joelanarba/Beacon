@@ -1,13 +1,14 @@
 """Dispatch engine (DB + Redis): nearest available responder, hospital capacity
 respected, and the no-responder path stays graceful. No RabbitMQ here —
 ``dispatch_incident`` is factored to be bus-free so the matching logic unit-tests
-directly. (The priority/bus behaviour is proven in test_bus_priority.py.)
+directly. Broker dequeue order is checked separately in test_bus_priority.py.
 """
 
 from __future__ import annotations
 
 import uuid
 
+import pytest
 from sqlalchemy import select
 
 from channels.base import ChannelKind, EmergencyType, Severity
@@ -64,6 +65,7 @@ async def _incident(db, *, etype, severity, latitude=None, longitude=None, area=
 # --------------------------------------------------------------------------- #
 # Responder matching
 # --------------------------------------------------------------------------- #
+@pytest.mark.redis
 async def test_match_nearest_skips_busy_and_picks_nearest_available(db_session):
     rc = make_redis()
     geo_key = f"test:geo:{uuid.uuid4().hex}"
@@ -130,6 +132,7 @@ async def test_hospital_capacity_respected(db_session):
 # --------------------------------------------------------------------------- #
 # End-to-end dispatch (bus-free core)
 # --------------------------------------------------------------------------- #
+@pytest.mark.redis
 async def test_dispatch_incident_assigns_and_audits(db_session):
     rc = make_redis()
     geo_key = f"test:geo:{uuid.uuid4().hex}"
@@ -184,6 +187,7 @@ async def test_dispatch_incident_assigns_and_audits(db_session):
     assert any(e.event_type == "incident.assigned" for e in logs)
 
 
+@pytest.mark.redis
 async def test_dispatch_incident_no_responder_stays_reported(db_session):
     rc = make_redis()
     empty_key = f"test:geo:empty:{uuid.uuid4().hex}"  # never populated

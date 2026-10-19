@@ -55,6 +55,8 @@ async def match_nearest(
     geo_key: str = RESPONDERS_GEO_KEY,
 ) -> ResponderMatch | None:
     """Nearest AVAILABLE responder of the required type, or None."""
+    if start_radius_m <= 0 or max_radius_m < start_radius_m:
+        raise ValueError("Invalid responder search radius")
     required = required_responder_type(emergency_type)
     radius = start_radius_m
     while radius <= max_radius_m:
@@ -74,25 +76,23 @@ async def match_nearest(
 
         if rows:
             ranked = [_member_and_distance(r) for r in rows]
-            ids = [member for member, _ in ranked]
-            result = await db.execute(
-                select(Responder).where(
-                    Responder.id.in_(ids),
-                    Responder.type == required,
-                    Responder.status == ResponderStatus.AVAILABLE,
-                )
-                # Claim-safe under concurrency: lock the candidate rows and skip
-                # any a parallel dispatcher is already holding, so two incidents
-                # can never be assigned the same responder.
-                .with_for_update(skip_locked=True)
-            )
-            available = {r.id: r for r in result.scalars().all()}
-            for member, distance in ranked:  # nearest first
-                if member in available:
-                    return ResponderMatch(
-                        responder=available[member], distance_m=distance
+            for member, distance in ranked:
+                result = await db.execute(
+                    select(Responder)
+                    .where(
+                        Responder.id == member,
+                        Responder.type == required,
+                        Responder.status == ResponderStatus.AVAILABLE,
                     )
+                    .with_for_update(skip_locked=True)
+                    .execution_options(populate_existing=True)
+                )
+                responder = result.scalar_one_or_none()
+                if responder is not None:
+                    return ResponderMatch(responder=responder, distance_m=distance)
 
-        radius *= 2  # widen and retry
+        if radius == max_radius_m:
+            break
+        radius = min(radius * 2, max_radius_m)
 
     return None

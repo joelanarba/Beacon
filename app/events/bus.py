@@ -1,21 +1,18 @@
-"""RabbitMQ event bus (aio-pika).
+"""Durable priority queues and confirmed publication for the outbox relay.
 
-One durable **topic** exchange carries the whole incident lifecycle. Queues are
-declared durable with ``x-max-priority`` so they are genuine **priority queues**:
-a CRITICAL message jumps ahead of a STANDARD one already waiting — which is the
-entire reason RabbitMQ was chosen over Kafka for emergency dispatch. Messages are
-published **persistent** with a priority derived from triage severity, and
-consumers run with a bounded prefetch.
-
-The bus object is created once in the app lifespan (``main.py``) and held on
-``app.state``; publishing from the request path is fire-and-forget.
+Priority applies to messages still waiting in the broker, subject to prefetch.
+The supervised worker owns the connection and restores initial setup after failure.
 """
 
 from __future__ import annotations
 
+import asyncio
+import json
+
 import aio_pika
 from pydantic import BaseModel
 
+from config import get_settings
 from utils.logging import get_logger
 
 log = get_logger("beacon.bus")
@@ -41,9 +38,22 @@ class EventBus:
     def max_priority(self) -> int:
         return self._max_priority
 
+    @property
+    def is_ready(self) -> bool:
+        return bool(
+            self._connection is not None
+            and self._connection.connected.is_set()
+            and self._channel is not None
+            and not self._channel.is_closed
+        )
+
     async def connect(self) -> None:
-        self._connection = await aio_pika.connect_robust(self._amqp_url)
-        self._channel = await self._connection.channel()
+        self._connection = await aio_pika.connect_robust(
+            self._amqp_url, timeout=get_settings().broker_timeout_seconds
+        )
+        self._channel = await self._connection.channel(
+            publisher_confirms=True, on_return_raises=True
+        )
         await self._channel.set_qos(prefetch_count=self._prefetch)
         self._exchange = await self._channel.declare_exchange(
             self._exchange_name, aio_pika.ExchangeType.TOPIC, durable=True
@@ -71,17 +81,35 @@ class EventBus:
         return queue
 
     async def publish(
-        self, routing_key: str, payload: BaseModel, priority: int = 0
+        self,
+        routing_key: str,
+        payload: BaseModel | dict,
+        priority: int = 0,
+        *,
+        message_id: str | None = None,
+        headers: dict | None = None,
     ) -> None:
-        """Publish a persistent, priority-tagged message (fire-and-forget)."""
+        """Await broker confirmation; reject unroutable messages and bound the wait."""
         assert self._exchange is not None
         message = aio_pika.Message(
-            body=payload.model_dump_json().encode(),
+            body=(
+                payload.model_dump_json()
+                if isinstance(payload, BaseModel)
+                else json.dumps(payload)
+            ).encode(),
             content_type="application/json",
             delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             priority=priority,
+            message_id=message_id,
+            headers=headers,
         )
-        await self._exchange.publish(message, routing_key=routing_key)
+        async with asyncio.timeout(get_settings().broker_timeout_seconds):
+            await self._exchange.publish(
+                message,
+                routing_key=routing_key,
+                mandatory=True,
+                timeout=get_settings().broker_timeout_seconds,
+            )
 
     async def close(self) -> None:
         if self._connection is not None:

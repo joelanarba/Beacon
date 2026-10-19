@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from channels.base import Severity
@@ -38,8 +38,8 @@ class Settings(BaseSettings):
     amqp_url: str = "amqp://beacon:beacon@rabbitmq:5672/"
 
     # Responder matching (Redis GEO).
-    responder_search_radius_m: int = 5000
-    responder_max_radius_m: int = 25000
+    responder_search_radius_m: int = Field(default=5000, ge=1)
+    responder_max_radius_m: int = Field(default=25000, ge=1)
 
     # USSD session state (Redis).
     ussd_session_ttl_seconds: int = 120
@@ -52,9 +52,17 @@ class Settings(BaseSettings):
     # Event bus (RabbitMQ).
     event_exchange: str = "beacon.events"
     max_queue_priority: int = 10
+    broker_timeout_seconds: float = Field(default=5, gt=0)
+    outbox_poll_seconds: float = Field(default=0.5, gt=0)
+    outbox_batch_size: int = Field(default=32, ge=1, le=1000)
+    delivery_max_retries: int = Field(default=5, ge=0, le=20)
+    delivery_retry_base_seconds: float = Field(default=1, gt=0)
+    delivery_retry_max_seconds: float = Field(default=60, gt=0)
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> Settings:
+        if self.responder_max_radius_m < self.responder_search_radius_m:
+            raise ValueError("Maximum responder radius must cover the starting radius")
         if self.environment.lower() == "production":
             if self.secret_key == "dev-insecure-change-me" or len(self.secret_key) < 32:
                 raise ValueError(

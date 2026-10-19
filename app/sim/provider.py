@@ -55,16 +55,17 @@ class SmsProvider(ABC):
 class SimulatedSmsProvider(SmsProvider):
     """Records outbound SMS to a Redis list instead of a paid API."""
 
-    def __init__(self, rc: redis.Redis) -> None:
+    def __init__(self, rc: redis.Redis, *, outbox_key: str = OUTBOX_KEY) -> None:
         self._rc = rc
+        self._outbox_key = outbox_key
 
     async def send_sms(self, to: str, message: str) -> None:
         entry = json.dumps(
             {"to": to, "message": message, "ts": datetime.now(UTC).isoformat()}
         )
         # Newest first; trim so the sink can't grow without bound.
-        await self._rc.lpush(OUTBOX_KEY, entry)
-        await self._rc.ltrim(OUTBOX_KEY, 0, _OUTBOX_CAP - 1)
+        await self._rc.lpush(self._outbox_key, entry)
+        await self._rc.ltrim(self._outbox_key, 0, _OUTBOX_CAP - 1)
         log.info("sim.sms_out", to=to)
 
 
@@ -73,9 +74,11 @@ def get_provider(rc: redis.Redis = Depends(get_redis)) -> SimulatedSmsProvider:
     return SimulatedSmsProvider(rc)
 
 
-async def read_outbox(rc: redis.Redis, limit: int = 50) -> list[dict]:
+async def read_outbox(
+    rc: redis.Redis, limit: int = 50, *, outbox_key: str = OUTBOX_KEY
+) -> list[dict]:
     """Return the most recent outbound SMS (newest first)."""
-    raw = await rc.lrange(OUTBOX_KEY, 0, max(0, limit - 1))
+    raw = await rc.lrange(outbox_key, 0, max(0, limit - 1))
     return [json.loads(item) for item in raw]
 
 

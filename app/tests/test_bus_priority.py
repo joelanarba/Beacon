@@ -1,6 +1,7 @@
-"""Priority proof: a CRITICAL message is dequeued before an already-waiting
-STANDARD one. This is the whole reason RabbitMQ priority queues were chosen for
-dispatch. Runs against the real broker (inside the container).
+"""Check dequeue order for two prequeued messages against a real broker.
+
+This does not establish priority-specific latency with active consumers,
+prefetch, concurrent processing, or failures.
 """
 
 from __future__ import annotations
@@ -8,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 
+import pytest
 from channels.base import ChannelKind, EmergencyType, Severity
 from config import get_settings
 from events.bus import EventBus
@@ -33,6 +35,7 @@ async def _get_one(queue, attempts: int = 50):
     raise AssertionError("expected a message but the queue stayed empty")
 
 
+@pytest.mark.rabbitmq
 async def test_critical_dequeued_before_waiting_standard():
     settings = get_settings()
     bus = EventBus(

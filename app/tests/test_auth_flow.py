@@ -7,7 +7,7 @@ from models.db import User, UserRole
 
 
 async def _make_user(
-    session, email: str = "dispatcher@test.local", password: str = "pw12345"
+    session, email: str = "dispatcher@example.com", password: str = "pw12345"
 ) -> tuple[str, str]:
     session.add(
         User(
@@ -62,8 +62,8 @@ async def test_login_me_refresh_logout(client, db_session):
 
 
 async def test_login_bad_credentials(client, db_session):
-    await _make_user(db_session, email="x@test.local", password="rightpw")
+    await _make_user(db_session, email="x@example.com", password="rightpw")
     resp = await client.post(
-        "/auth/login", json={"email": "x@test.local", "password": "wrongpw"}
+        "/auth/login", json={"email": "x@example.com", "password": "wrongpw"}
     )
     assert resp.status_code == 401

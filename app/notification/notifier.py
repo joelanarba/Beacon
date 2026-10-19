@@ -17,6 +17,7 @@ from __future__ import annotations
 import aio_pika
 
 from events.bus import EventBus
+from events.outbox import consume_reliably
 from events.schemas import (
     RK_ASSIGNED,
     RK_EN_ROUTE,
@@ -78,11 +79,12 @@ async def notify_assignment(
             metrics.notifications_total.labels(
                 egress_channel="sms", result="sent"
             ).inc()
-        except Exception as exc:  # noqa: BLE001 — record the failure, don't crash
-            log.warning("notify.sms_failed", error=str(exc))
+        except Exception as exc:
+            log.warning("notify.sms_failed", error_type=type(exc).__name__)
             metrics.notifications_total.labels(
                 egress_channel="sms", result="error"
             ).inc()
+            raise
     else:
         _record("websocket", await hub.broadcast(payload, role=ROLE_RESPONDER))
 
@@ -108,7 +110,7 @@ async def notify_status_change(
 
 def _make_handler(hub: ConnectionHub):
     async def handler(message: aio_pika.abc.AbstractIncomingMessage) -> None:
-        async with message.process(requeue=False):
+        async def process() -> None:
             if message.routing_key == RK_ASSIGNED:
                 event = IncidentAssigned.model_validate_json(message.body)
                 redis = make_redis()
@@ -121,6 +123,8 @@ def _make_handler(hub: ConnectionHub):
             else:  # RK_EN_ROUTE / RK_RESOLVED
                 status_event = IncidentStatusChanged.model_validate_json(message.body)
                 await notify_status_change(status_event, hub=hub)
+
+        await consume_reliably(message, "notification", process)
 
     return handler
 
