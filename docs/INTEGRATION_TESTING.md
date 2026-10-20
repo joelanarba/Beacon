@@ -8,7 +8,8 @@ The earlier reliability result of 70 passed / 8 skipped is separate evidence.
 
 Create a Codespace, or rebuild an existing one, using this repository's
 `.devcontainer/devcontainer.json`. It selects Python 3.11 and Docker-in-Docker;
-the creation command installs `app/requirements.txt` in `.venv-integration`.
+its Dockerfile removes the unused inherited Yarn APT source before Features
+install. The creation command installs `app/requirements.txt` in `.venv-integration`.
 From the repository root, run:
 
 ```bash
@@ -38,6 +39,44 @@ Tests intentionally fail if the runtime is unavailable; they do not silently
 skip. Every scenario uses a fresh project and can take time to start PostgreSQL,
 Redis, and RabbitMQ. The default retry-exhaustion test includes delays of 1, 2, 4,
 8, and 16 seconds. This is a correctness suite, not a performance benchmark.
+
+## Recovery mode: inherited Yarn repository key
+
+The reported Codespaces creation log on 2026-10-20 failed at 01:41:32 UTC while
+installing Docker-in-Docker 2.17.0. The base image downloaded successfully; the
+feature's `apt-get update` then rejected `https://dl.yarnpkg.com/debian` with
+`NO_PUBKEY 62D54FD4003F6525` and exited 100. Codespaces started its Alpine recovery
+container. Docker installation and the Python dependency setup did not complete.
+
+This is a confirmed environment-build failure. The integration runner did not
+start: **0 scenarios passed, 0 failed, 0 skipped, and 17 were not run**. There are
+no integration-run artifacts to diagnose, and the harness created no test stack
+whose teardown could be verified.
+
+The scoped correction is `.devcontainer/Dockerfile`, based on the same Python
+image, which removes `/etc/apt/sources.list.d/yarn.list` before Features run.
+Beacon has no Yarn dependency. APT signature verification remains enabled for
+the remaining sources. A similar inherited-source failure and Dockerfile
+workaround are recorded in the [upstream issue](https://github.com/devcontainers/features/issues/1543).
+Application code, service configuration, and scenario assertions are unchanged.
+
+To retry from the existing recovery terminal, first preserve any local edits,
+then update the checkout:
+
+```bash
+git pull --ff-only origin main
+```
+
+Use **Codespaces: Rebuild Container** from the Command Palette. Removing the
+source in the recovery container itself does not change the image used for the
+real build. After rebuilding and completing dependency installation, run the
+three commands in the Run section. If creation fails again, inspect the first
+error in **Codespaces: View Creation Log** before changing another component.
+
+JSON, Dockerfile-path, and diff checks passed locally. The matching devcontainers
+CLI 0.83.3 could not finish `read-configuration` because it requires a Docker
+executable, which is absent on the local host. The correction still requires an
+actual Codespaces rebuild to verify; no integration success is claimed.
 
 ## Coverage
 
