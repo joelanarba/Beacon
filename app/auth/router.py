@@ -4,6 +4,9 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from jose import JWTError
 from sqlalchemy import select
@@ -23,6 +26,28 @@ from models.schemas import LoginRequest, RefreshRequest, Token, UserRead
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 _UNAUTHORIZED = status.HTTP_401_UNAUTHORIZED
+
+
+async def _stored_refresh(session: AsyncSession, claims: dict) -> RefreshToken | None:
+    try:
+        UUID(claims["sub"])
+    except ValueError:
+        return None
+    # Rotation and logout serialize on the same token row. Re-read its current
+    # state after the lock is acquired, even if this session loaded it earlier.
+    result = await session.execute(
+        select(RefreshToken)
+        .where(
+            RefreshToken.jti == claims["jti"],
+            RefreshToken.user_id == claims["sub"],
+        )
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    stored = result.scalar_one_or_none()
+    if stored is None or stored.revoked or stored.expires_at <= datetime.now(UTC):
+        return None
+    return stored
 
 
 @router.post("/login", response_model=Token)
@@ -58,11 +83,8 @@ async def refresh(
     if claims.get("type") != "refresh":
         raise HTTPException(status_code=_UNAUTHORIZED, detail="Invalid refresh token")
 
-    result = await session.execute(
-        select(RefreshToken).where(RefreshToken.jti == claims.get("jti"))
-    )
-    stored = result.scalar_one_or_none()
-    if stored is None or stored.revoked:
+    stored = await _stored_refresh(session, claims)
+    if stored is None:
         raise HTTPException(
             status_code=_UNAUTHORIZED, detail="Refresh token revoked or unknown"
         )
@@ -98,11 +120,10 @@ async def logout(
     except JWTError:
         return  # idempotent: an unparseable token is already "logged out"
 
-    result = await session.execute(
-        select(RefreshToken).where(RefreshToken.jti == claims.get("jti"))
-    )
-    stored = result.scalar_one_or_none()
-    if stored is not None and not stored.revoked:
+    if claims.get("type") != "refresh":
+        return
+    stored = await _stored_refresh(session, claims)
+    if stored is not None:
         stored.revoked = True
         await session.commit()
 

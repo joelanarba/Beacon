@@ -7,6 +7,11 @@ projects passed cleanup checks. The passing evidence below applies to commit
 `7894efd93fe003d157d8beed28d705fedac17729`; the preceding failed run and earlier
 70 passed / 8 skipped reliability result remain separate records.
 
+The subsequent [authentication checkpoint](SECURITY_REVIEW.md) changes token
+validation and two dependency pins. It requires a fresh Codespaces run: update
+`.venv-integration` with `pip install -r app/requirements.txt` before invoking
+the runner. The passing result below applies to its recorded revision only.
+
 ## Run
 
 Create a Codespace, or rebuild an existing one, using this repository's

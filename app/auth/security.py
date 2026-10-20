@@ -12,7 +12,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from jose import jwt
+from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from config import get_settings
@@ -81,4 +81,21 @@ def create_refresh_token(subject: str) -> tuple[str, str, datetime]:
 def decode_token(token: str) -> dict:
     """Decode + verify a JWT. Raises ``jose.JWTError`` on any failure."""
     settings = get_settings()
-    return jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
+    try:
+        claims = jwt.decode(
+            token,
+            settings.secret_key,
+            algorithms=[settings.jwt_algorithm],
+            options={
+                "require_sub": True,
+                "require_jti": True,
+                "require_iat": True,
+                "require_exp": True,
+            },
+        )
+        uuid.UUID(claims["jti"])
+        if not claims["sub"].strip() or claims.get("type") not in {"access", "refresh"}:
+            raise JWTError("Invalid token identity or type")
+    except (TypeError, ValueError, AttributeError, OverflowError) as exc:
+        raise JWTError("Invalid token claims") from exc
+    return claims

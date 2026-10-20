@@ -92,6 +92,10 @@ async def ws_dispatch(websocket: WebSocket, token: str = "") -> None:
         await websocket.close(code=4401)  # policy violation: bad/missing token
         return
 
+    if claims.get("role") not in {"DISPATCHER", "ADMIN"}:
+        await websocket.close(code=4403)
+        return
+
     await hub.connect(websocket, ROLE_DISPATCHER)
     try:
         while True:

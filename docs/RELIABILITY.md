@@ -151,6 +151,12 @@ this correctness suite. The wider audit's authentication, dependency-security,
 location, and notification findings also remain open unless explicitly covered
 by these tests. No further application fix is indicated by the passing run.
 
+The subsequent [authentication review](SECURITY_REVIEW.md) records the corrected
+refresh-token race, dispatcher WebSocket role checks, required JWT claims,
+dependency changes, and their separate local validation. Those changes require
+a new real-service run. The [focused research plan](RESEARCH_PLAN.md) defines
+the proposed scheduling comparison; no experiment results are available yet.
+
 ## Verification on 2026-10-19
 
 Validation used CPython 3.11.17 with the existing pinned application requirements
