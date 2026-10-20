@@ -1,10 +1,11 @@
 # Real-service tests in Codespaces
 
-The first completed Codespaces run reported **13 service scenarios passed and
-4 failed**, with no skips or scenarios left unrun. Its 22 local harness checks
-also passed. The two resulting fixes below still require a new Docker run;
-local regression checks do not establish service recovery. The earlier
-reliability result of 70 passed / 8 skipped is separate evidence.
+The Codespaces rerun on 2026-10-20 passed **all 17 real-service scenarios and
+30 harness checks**, with zero failures, errors, skips, or scenarios left unrun.
+The nested regression suite passed **79 tests with no skips**. All 18 disposable
+projects passed cleanup checks. The passing evidence below applies to commit
+`7894efd93fe003d157d8beed28d705fedac17729`; the preceding failed run and earlier
+70 passed / 8 skipped reliability result remain separate records.
 
 ## Run
 
@@ -163,8 +164,59 @@ echo "runner_exit=$?"
 ```
 
 No dev-container rebuild or dependency reinstall is required for these Python
-changes; the runner builds the app image from the updated checkout. The next run
+changes; the runner builds the app image from the updated checkout. The harness
 collects 47 top-level cases: 30 harness checks and the same 17 service scenarios.
+
+## Passing Codespaces rerun on 2026-10-20
+
+The rerun tested commit `7894efd93fe003d157d8beed28d705fedac17729`, confirmed
+by the saved `git rev-parse HEAD` command. The user supplied the terminal output
+and read-only summaries of the saved manifest, both JUnit files, all seventeen
+service cases, and cleanup commands. These artifacts remain in Codespaces under:
+
+```text
+/workspaces/Beacon/artifacts/integration/20261020T024338Z-586204026d9c47eabf7f310a17ddfd00
+```
+
+The exact user commands were:
+
+```bash
+git pull --ff-only origin main
+.venv-integration/bin/python scripts/run_integration.py
+echo "runner_exit=$?"
+```
+
+The runner recorded CPython 3.11.13, start time `2026-10-20T02:43:38.548103+00:00`,
+finish time `2026-10-20T02:51:39.136301+00:00`, `status=passed`, and
+`pytest_exit_code=0`. Pytest reported **47 passed in 479.69 seconds**; the shell
+reported `runner_exit=0`.
+
+| Scope | Passed | Failed | Errors | Skipped | Not run |
+|---|---:|---:|---:|---:|---:|
+| Real-service scenarios | 17 | 0 | 0 | 0 | 0 |
+| Local harness checks | 30 | 0 | 0 | 0 | 0 |
+| All top-level cases (`junit.xml`) | 47 | 0 | 0 | 0 | 0 |
+| Nested existing regressions (`regression.xml`) | 79 | 0 | 0 | 0 | 0 |
+
+The nested report is
+`beacon-it-89764044d3a54384b0138c5478594269/regression.xml`. Its tests run inside
+one of the seventeen scenarios; the 79 are not additional top-level scenarios.
+Individual case review confirmed all nine fault cases, seven pipeline cases,
+and the regression wrapper passed, including the four cases that failed before
+the queue-retention and controller-port corrections.
+
+Cleanup review found **18 scoped teardown commands, all successful**, with all
+18 projects passing their subsequent empty-container, empty-volume, and
+empty-network checks. Follow-up Docker listings for `com.beacon.integration.run`
+also showed no containers, volumes, or networks. No cleanup or data-isolation
+failure was observed; images and build cache remain intentionally retained.
+
+There is no actionable failed scenario in this run and no further application
+fix justified by these results. Pytest reported one passlib `crypt` deprecation
+warning; it did not fail a test. This records disposable PostgreSQL, Redis, and
+RabbitMQ correctness coverage for the tested revision. Live SMS, production/AWS
+operation, performance/capacity, and broader audit findings remain unverified by
+this suite. Preserve both failed and passing evidence directories for comparison.
 
 ## Coverage
 

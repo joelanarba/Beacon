@@ -136,15 +136,20 @@ real broker restart behavior, live telecom delivery, or deployment correctness.
 
 The disposable real-service harness is now implemented; see
 [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) for Codespaces setup, coverage,
-commands, and the distinction between local harness checks and pending Docker
-execution. The verification table below remains the first-pass evidence.
+commands, failed-run diagnosis, and the passing Codespaces rerun. On 2026-10-20,
+tested commit `7894efd93fe003d157d8beed28d705fedac17729` passed all 17 real-service
+scenarios and 30 harness checks. Its nested regression report passed 79 tests
+with no skips. All 18 disposable projects passed scoped teardown and subsequent
+empty-resource checks. The verification table below remains the separate
+first-pass evidence from 2026-10-19.
 
-Real RabbitMQ outage/restart and consumer-kill runs, a complete service-stack smoke
-test, workload generators, priority-specific measurements, and the proposed
-experiments remain required. AWS deployment and performance results are not
-established by this implementation pass. The wider audit's authentication,
-dependency-security, location, and notification findings also remain open unless
-explicitly covered by a regression above.
+This run covers real RabbitMQ interruption/reconnection, worker kills, service
+retries, and the complete incident path using simulated SMS. Workload generators,
+priority-specific measurements, and the proposed experiments remain outstanding.
+Live telecom, AWS deployment, capacity, and performance are not established by
+this correctness suite. The wider audit's authentication, dependency-security,
+location, and notification findings also remain open unless explicitly covered
+by these tests. No further application fix is indicated by the passing run.
 
 ## Verification on 2026-10-19
 
