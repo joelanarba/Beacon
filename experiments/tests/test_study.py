@@ -2,8 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import shlex
+import shutil
+import subprocess
 import time
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -108,6 +113,100 @@ def test_study_config_retains_private_ownership_and_excludes_production_hooks():
     assert all(not item.get("external") for item in config["networks"].values())
     assert config["services"]["app"]["environment"]["BEACON_STUDY_POLICY"] == "equal"
     assert "experiments" in config["configs"]["integration-entry"]["file"]
+
+
+@pytest.mark.parametrize("policy", ["equal", "severity"])
+@pytest.mark.parametrize(
+    "cookie_present,application_running,healthy",
+    [
+        (False, True, False),
+        (True, False, False),
+        (True, True, True),
+    ],
+)
+def test_study_health_probe_rejects_runtime_only_readiness(
+    tmp_path, policy, cookie_present, application_running, healthy
+):
+    shell = shutil.which("sh")
+    if shell is None:
+        candidate = (
+            Path(os.environ.get("ProgramFiles", "C:/Program Files"))
+            / "Git/usr/bin/sh.exe"
+        )
+        shell = str(candidate) if candidate.is_file() else None
+    if shell is None:
+        pytest.fail("A POSIX shell is required to exercise the generated probe")
+    images = {
+        s: "sha256:" + "a" * 64
+        for s in ("app", "migrate", "postgres", "redis", "rabbitmq")
+    }
+    probe = compose_config(policy, Settings(), images)["services"]["rabbitmq"][
+        "healthcheck"
+    ]
+    cookie = tmp_path / "synthetic-cookie"
+    if cookie_present:
+        cookie.write_text("synthetic")
+    entry = tmp_path / "fake-entrypoint.sh"
+    entry.write_text(
+        '[ "$1" = rabbitmq-diagnostics ] || exit 90\n'
+        'case "$3" in\n'
+        "  ping) exit 0;;\n"
+        '  check_running) [ "$STUDY_FAKE_APP_RUNNING" = 1 ];;\n'
+        "  *) exit 91;;\nesac\n",
+        encoding="utf-8",
+    )
+    # Exercise the actual generated shell expression with synthetic CLI responses.
+    command = (
+        probe["test"][1]
+        .replace("/var/lib/rabbitmq/.erlang.cookie", shlex.quote(cookie.as_posix()))
+        .replace(
+            "docker-entrypoint.sh",
+            shlex.quote(Path(shell).as_posix()) + " " + shlex.quote(entry.as_posix()),
+        )
+    )
+    result = subprocess.run(
+        [shell, "-c", command],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        env={**os.environ, "STUDY_FAKE_APP_RUNNING": str(int(application_running))},
+    )
+    assert (result.returncode == 0) is healthy, result.stderr
+
+
+@pytest.mark.parametrize(
+    "elapsed,seconds,expected",
+    [
+        (0.1, 0.5, "invalid"),
+        (2, 0.5, "passed"),
+        (1, 1, "passed"),
+        (16.480698979, 4.790797679, "invalid"),
+    ],
+)
+def test_queue_errors_outside_broker_recovery_remain_invalid(
+    tmp_path, elapsed, seconds, expected
+):
+    directory = tmp_path / "trial"
+    result = evidence(directory)
+    result["trial"]["condition"] = "broker_outage"
+    result["events"] = [
+        {"event": "stop_requested", "elapsed": 1.314192392},
+        {"event": "broker_healthy", "elapsed": 14.164462161},
+    ]
+    with (directory / "service_samples.jsonl").open("a") as stream:
+        stream.write(
+            json.dumps(
+                {
+                    "elapsed": elapsed,
+                    "sample_seconds": seconds,
+                    "queues_error": "synthetic broker query failure",
+                    "resources": [{"CPUPerc": "1%"}],
+                }
+            )
+            + "\n"
+        )
+    summary = summarize_trial(directory, result, 4)
+    assert summary["status"] == expected
 
 
 @pytest.mark.parametrize("policy,expected", [("equal", 0), ("severity", 10)])

@@ -1,7 +1,9 @@
 # Running the scheduling study
 
-Status on 2026-10-20: implemented and checked locally; **no Docker calibration or
-measured study trial has run**. The 17 passing incident-processing scenarios in
+Status on 2026-10-20: **first Docker calibration invalid; corrected broker
+readiness probe requires a new calibration**. Both healthy trials passed; both
+outage trials were invalidated by a premature recovery timestamp. The forty-run
+measured study has not started. The 17 passing incident-processing scenarios in
 [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) validate the earlier correctness
 checkpoint, not this study launcher. The question, hypotheses, and limitations
 are in [RESEARCH_PLAN.md](RESEARCH_PLAN.md).
@@ -101,6 +103,9 @@ not run. Setup/fault failures remain failures with their saved error and logs.
   stop/start, and health detection add time. Actual timestamps are recorded; do
   not describe this as exactly three seconds of unavailability. Blocking Docker
   operations run off the request scheduler. The app stays running.
+  The generated study health probe now uses `check_running` through the image
+  entrypoint, with the existing cookie guard, to require the RabbitMQ application.
+  Runtime-only `ping` is insufficient for this recovery boundary.
 - Database snapshots are sampled at 0.25-second intervals plus query time; live
   `rabbitmqctl` queue counts and Docker resource samples at two-second intervals
   plus command time. Sample durations/errors are retained. Queue failures that
@@ -150,6 +155,86 @@ The bounded SMS list is not a complete delivery ledger.
 Abruptly killing the controller or Codespace can bypass cleanup. Inspect retained
 project names and ownership-label listings before any manual cleanup; never use
 global prune. Preserve failed evidence and synthetic analysis fixtures.
+
+## First Codespaces calibration: invalid recovery measurement
+
+Tested revision: `ecf72adf67e4fe1512ba0ffe18af4d3b837b81ac`, confirmed by the
+saved Git command. The user supplied terminal output and read-only summaries of
+the root manifest, warmup/trial statuses, fault timestamps, service samples,
+failed commands, and cleanup checks. Complete artifacts remain in Codespaces:
+
+```text
+/workspaces/Beacon/artifacts/study/calibration-20261020T101144Z
+```
+
+The user pulled `main`, installed `experiments/requirements.txt`, and ran:
+
+```bash
+.venv-integration/bin/python -m experiments.run calibrate --output "artifacts/study/calibration-$(date -u +%Y%m%dT%H%M%SZ)"
+echo "calibration_exit=$?"
+```
+
+CPython was 3.11.13; the manifest status was `invalid` and the runner exited one.
+
+| Scope | Passed | Invalid | Failed | Skipped | Not run |
+|---|---:|---:|---:|---:|---:|
+| Healthy calibration trials | 2 | 0 | 0 | 0 | 0 |
+| Broker-outage calibration trials | 0 | 2 | 0 | 0 | 0 |
+| Separate warmups | 4 | 0 | 0 | 0 | 0 |
+| Forty-run measured batch | 0 | 0 | 0 | 0 | 40 |
+
+Both invalid trials reported only `Live queue sampling failed outside the
+injected outage`. This is a confirmed study readiness/measurement defect:
+
+| Policy | Recorded broker-healthy time (UTC) | First subsequent failed queue command (UTC) | Evidence |
+|---|---|---|---|
+| Equal | 10:15:10.470322 | 10:15:12.786842–10:15:15.332262 | `rabbitmqctl list_queues` exited 64 because the `rabbit` application was not running. |
+| Severity | 10:16:36.092259 | 10:16:38.645058–10:16:41.029627 | Same command, exit code, and startup error. |
+
+The inherited health probe used `rabbitmq-diagnostics ping`, which establishes
+runtime reachability and CLI authentication, not RabbitMQ application readiness.
+The [RabbitMQ 3.13 diagnostics manual](https://www.rabbitmq.com/docs/3.13/man/rabbitmq-diagnostics.8)
+distinguishes that check from `check_running`. Therefore the runner closed its
+intentional-outage window too early and sampled legitimate broker startup as an
+unexpected outage. The old recovery durations are not valid measurements.
+
+The scoped correction changes only the generated study health command to
+`check_running`. It retains the cookie guard, entrypoint privilege drop, probe
+timings, workload, scheduling policies, observation deadline, and rejection of
+queue failures outside the outage. Production code and the existing integration
+Compose file are unchanged. There is no arbitrary grace interval or reclassification
+of the saved run as passing.
+
+Later samples show both worker consumers restored and both queues drained.
+Assignment completion was observed at controller elapsed times 42.685403 s
+(equal) and 41.520228 s (severity), before their 124.770007 s and 124.435299 s
+drain deadlines. These observations do not rescue the invalid timing boundary
+or establish a scheduling improvement. No application defect was established by
+these failures.
+
+All **nine** owned projects (one build, four warmups, four calibration trials)
+completed scoped teardown and subsequent empty-resource checks. Follow-up
+ownership-label listings contained no containers, volumes, or networks; no
+owned data-resource leak was observed. Retain the complete invalid run and use
+a new output directory for all four corrected calibration trials. Do not freeze
+this run or start the forty-trial batch yet.
+
+Local correction validation on CPython 3.11.17 reported **71 passed**, with zero
+failures, errors, or skips, in 47.44 seconds: 41 study checks plus the existing
+30 harness checks. JUnit is retained at
+`artifacts/study/broker-readiness-correction-20261020/junit.xml`. The generated
+shell probe was exercised against scripted CLI responses for both policies:
+missing cookie, runtime up/application down, and application running. The old
+probe falsely passed both application-down cases before correction. Separate
+boundary cases verify that queue errors before or after the recorded outage
+remain invalid; the analysis gate was not weakened.
+
+Ruff, Black, Python 3.11 syntax parsing, diff checks, and offline normalization
+of both generated Compose configurations passed. Probe interval, timeout, and
+retry count match the inherited values. These local checks use scripted CLI
+responses, not a live RabbitMQ restart; Docker remains unavailable on the local
+host. Corrected Codespaces calibration has not run. The saved original run
+remains invalid and is not eligible for freezing or performance claims.
 
 ## Local verification and unrun work
 

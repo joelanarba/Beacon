@@ -161,8 +161,10 @@ It also preserves the intervening RabbitMQ cookie-permission startup failure and
 the scoped integration-health-check correction tested by that rerun. The
 [focused research plan](RESEARCH_PLAN.md) defines the proposed scheduling
 comparison; [RESEARCH_RUNNING.md](RESEARCH_RUNNING.md) documents its isolated
-runner and artifact-only analysis. Calibration and measured trials have not run;
-no experiment results are available yet.
+runner and artifact-only analysis. The first calibration passed two healthy
+trials and invalidated two outage trials due to the study's premature broker
+readiness boundary. Corrected calibration and the forty-run measured study
+remain unrun; no scheduling improvement has been established.
 
 ## Verification on 2026-10-19
 

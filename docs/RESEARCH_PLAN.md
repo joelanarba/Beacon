@@ -1,9 +1,12 @@
 # Focused study: severity scheduling during backlog and broker recovery
 
-Status on 2026-10-20: **runner and artifact analysis implemented; Docker study
-not yet run**. The isolated baseline, seeded workload, calibration gate, and
-analysis have local control tests; these are not performance results or a novelty
-claim. Setup and execution are in [RESEARCH_RUNNING.md](RESEARCH_RUNNING.md).
+Status on 2026-10-20: **first Docker calibration invalid; corrected readiness
+probe awaiting a new calibration**. The isolated baseline, seeded workload,
+calibration gate, and analysis are implemented and checked locally. Two healthy
+calibration trials passed; two outage trials had an invalid broker recovery
+boundary. The forty-run measured study remains unrun; no scheduling improvement
+or novelty claim is established. Evidence and execution steps are in
+[RESEARCH_RUNNING.md](RESEARCH_RUNNING.md).
 The real-service correctness gate, including authentication, passed at
 `cd9c753d6ef8587fd7b9f15e3710c41c86cc7a22`; see
 [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md). Remaining public-ingress

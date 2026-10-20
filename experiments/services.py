@@ -38,6 +38,13 @@ def compose_config(policy: str, settings: Settings, images: dict) -> dict:
         BEACON_STUDY_POLICY=policy,
         BEACON_STUDY_DELAY_MS=str(settings.dispatch_delay_ms),
     )
+    # Recovery timing requires the RabbitMQ application, not only its Erlang VM.
+    # Keep the cookie guard and image entrypoint's privilege drop intact.
+    config["services"]["rabbitmq"]["healthcheck"]["test"] = [
+        "CMD-SHELL",
+        "test -s /var/lib/rabbitmq/.erlang.cookie && exec "
+        "docker-entrypoint.sh rabbitmq-diagnostics -q check_running",
+    ]
     return config
 
 
