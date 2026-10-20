@@ -1,10 +1,13 @@
 # Focused study: severity scheduling during backlog and broker recovery
 
-Status on 2026-10-20: **design only**. No study runner, baseline switch, workload,
-performance result, or novelty claim is established by this document. The real
-service correctness baseline is recorded in [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md).
-The subsequent authentication checkpoint must pass its Codespaces gate first;
-remaining public-ingress restrictions are in [SECURITY_REVIEW.md](SECURITY_REVIEW.md).
+Status on 2026-10-20: **runner and artifact analysis implemented; Docker study
+not yet run**. The isolated baseline, seeded workload, calibration gate, and
+analysis have local control tests; these are not performance results or a novelty
+claim. Setup and execution are in [RESEARCH_RUNNING.md](RESEARCH_RUNNING.md).
+The real-service correctness gate, including authentication, passed at
+`cd9c753d6ef8587fd7b9f15e3710c41c86cc7a22`; see
+[INTEGRATION_TESTING.md](INTEGRATION_TESTING.md). Remaining public-ingress
+restrictions are in [SECURITY_REVIEW.md](SECURITY_REVIEW.md).
 
 ## Question and hypotheses
 
@@ -141,11 +144,13 @@ or exactly-once outcome in this experiment.
 7. Generate ECDFs or class-latency plots, paired comparison plots, and a recovery
    timeline from the raw artifacts. Report negative and inconclusive results.
 
-No experiment execution commands are claimed yet. Implementation must provide
-one documented runner command and one artifact-only analysis command, validate
-input/configuration, return nonzero on correctness or cleanup failure, and never
-overwrite an existing evidence directory. A dry run must prove those properties
-before the forty-run batch is started.
+The [execution guide](RESEARCH_RUNNING.md) provides the runner and artifact-only
+analysis commands, local validation evidence, and the unrun Docker gate. The
+runner rejects invalid configuration and reused output directories, returns
+nonzero on correctness/cleanup failure or an unobserved mixed-class backlog,
+and preserves invalid trials. Offline dry runs generate plans only. Four real
+calibration trials, each with a separate warmup, must pass before parameters
+can be frozen and the forty-run batch started.
 
 ## Limits and completion criteria
 
@@ -160,5 +165,5 @@ The research checkpoint is complete only when another developer can reproduce
 the pinned setup, execute the declared trials, regenerate the figures, and trace
 every reported number to retained raw observations and correctness checks. The
 report must explain the mechanism, fairness tradeoff, uncertainty, and limitations.
-Until then Beacon has a tested systems implementation and an experiment design,
-not measured research results.
+Until then Beacon has a tested systems implementation and locally tested study
+tooling, not measured research results.

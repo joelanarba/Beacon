@@ -1,0 +1,3 @@
+# Host-only plotting dependency; never added to the production image.
+-r ../app/requirements.txt
+matplotlib==3.10.8

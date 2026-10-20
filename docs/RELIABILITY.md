@@ -160,7 +160,9 @@ dependency changes, local validation, and the latest passing real-service run.
 It also preserves the intervening RabbitMQ cookie-permission startup failure and
 the scoped integration-health-check correction tested by that rerun. The
 [focused research plan](RESEARCH_PLAN.md) defines the proposed scheduling
-comparison; no experiment results are available yet.
+comparison; [RESEARCH_RUNNING.md](RESEARCH_RUNNING.md) documents its isolated
+runner and artifact-only analysis. Calibration and measured trials have not run;
+no experiment results are available yet.
 
 ## Verification on 2026-10-19
 
