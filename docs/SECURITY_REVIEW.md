@@ -3,8 +3,12 @@
 Reviewed on 2026-10-20 after the passing real-service baseline at
 `7894efd93fe003d157d8beed28d705fedac17729`. That baseline passed 17 service
 scenarios, 30 harness checks, and 79 nested regressions. It does not validate the
-subsequent changes in this checkpoint. This is a focused review, not a complete
-security assessment or approval for public emergency-service operation.
+subsequent changes in this checkpoint. The later run at
+`cd9c753d6ef8587fd7b9f15e3710c41c86cc7a22` passed the same 17 service scenarios
+and 30 harness checks, plus all 100 nested regressions, including the 21 new
+authentication cases; its evidence is recorded below. This is a focused review,
+not a complete security assessment or approval for public emergency-service
+operation.
 
 ## Findings and corrections
 
@@ -66,10 +70,10 @@ Ruff passed for `app`, `integration_tests`, and the runner. Black checks passed;
 and dependency compatibility, not the absence of vulnerabilities. The final run
 emitted multipart-import and Starlette/AnyIO deprecation warnings.
 
-The subsequent Codespaces run below exercised the rebuilt image and real
-services, including the new authentication regressions. Its one broker-startup
-failure leaves full integration validation incomplete. Remote CI execution has
-not been verified.
+The Codespaces runs below exercised the rebuilt image and real services,
+including the new authentication regressions. The first failed during broker
+startup; the subsequent run passed after the scoped health-check correction.
+Remote CI execution has not been verified.
 
 ## Codespaces run: authentication passed, broker startup failed
 
@@ -136,8 +140,61 @@ containers, volumes, or networks. No cleanup leak was observed. The trapped
 bcrypt version warning and the `crypt`/multipart import warnings are distinct
 from the broker's fatal cookie-permission error.
 
-The corrected health check still requires a new Codespaces run; no successful
-runtime test of that correction is claimed from this Windows environment.
+This failed run did not validate the corrected health check. Its subsequent
+runtime validation is the separate Codespaces rerun below, not a local Windows
+Docker run.
+
+## Passing Codespaces rerun after the health-check correction
+
+Tested revision: `cd9c753d6ef8587fd7b9f15e3710c41c86cc7a22`, confirmed by the
+saved `git rev-parse HEAD` output. The user supplied the runner terminal output
+and read-only summaries of the saved manifest, both JUnit files, and scoped
+cleanup checks. The complete artifacts remain in Codespaces at:
+
+```text
+/workspaces/Beacon/artifacts/integration/20261020T041411Z-2d56efdef10745068e92faef78dd44cf
+```
+
+The execution commands were:
+
+```bash
+git pull --ff-only origin main
+.venv-integration/bin/python scripts/run_integration.py
+echo "runner_exit=$?"
+```
+
+The manifest records CPython 3.11.13, start
+`2026-10-20T04:14:11.753453+00:00`, finish
+`2026-10-20T04:21:52.854524+00:00`, `status=passed`, and
+`pytest_exit_code=0`. Pytest reported **47 passed in 460.54 seconds**; the shell
+reported `runner_exit=0`.
+
+| Scope | Passed | Failed | Errors | Skipped | Not run |
+|---|---:|---:|---:|---:|---:|
+| Real-service scenarios | 17 | 0 | 0 | 0 | 0 |
+| Harness checks | 30 | 0 | 0 | 0 | 0 |
+| All top-level cases | 47 | 0 | 0 | 0 | 0 |
+| Nested application regressions | 100 | 0 | 0 | 0 | 0 |
+| Authentication-boundary subset of nested regressions | 21 | 0 | 0 | 0 | 0 |
+
+The nested report is
+`beacon-it-02b444e36e29433fb78a67dc6800dde9/regression.xml`. Its authentication
+cases are part of the 100 regressions; those regressions run inside one of the
+17 service scenarios and are not additional top-level scenarios.
+
+All **18 scoped teardown commands succeeded**, and all 18 projects passed the
+subsequent empty-resource checks. Follow-up integration-label listings contained
+no containers, volumes, or networks. No owned data-resource leak was observed;
+images and build cache remain intentionally retained.
+
+The formerly failing broker-startup scenario passed in this run. There is no
+actionable failure or further application fix justified by these results. One
+passing run does not establish that an intermittent race cannot recur, and the
+earlier cookie-ownership mechanism remains an inference because ownership was
+not captured. Pytest reported `crypt` and multipart-import deprecation warnings;
+neither failed a test. This is disposable-service correctness evidence for the
+recorded revision, not live SMS, deployment, capacity, performance, or a complete
+security assessment. Preserve both failed and passing evidence directories.
 
 ## Codespaces validation gate
 
@@ -154,8 +211,8 @@ echo "runner_exit=$?"
 Preserve the new run's `result.json`, `junit.xml`, nested `regression.xml`, command
 log, and service snapshots. The expected collection is still 47 top-level cases
 (30 harness checks and 17 service scenarios); the nested application suite now
-collects 100 cases. These counts are coverage expectations, not Docker results.
-Review failures and cleanup before marking this revision integration-verified.
+collects 100 cases. These counts were observed for the passing revision above;
+future changes require their own run and review of failures and cleanup.
 
 ## Remaining work, in order
 

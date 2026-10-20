@@ -1,20 +1,25 @@
 # Real-service tests in Codespaces
 
-The Codespaces rerun on 2026-10-20 passed **all 17 real-service scenarios and
-30 harness checks**, with zero failures, errors, skips, or scenarios left unrun.
-The nested regression suite passed **79 tests with no skips**. All 18 disposable
-projects passed cleanup checks. The passing evidence below applies to commit
-`7894efd93fe003d157d8beed28d705fedac17729`; the preceding failed run and earlier
-70 passed / 8 skipped reliability result remain separate records.
+The latest reviewed Codespaces run on 2026-10-20 passed **all 17 real-service
+scenarios and 30 harness checks**, with zero failures, errors, skips, or scenarios
+left unrun. Its nested regression suite passed **100 tests**, including all
+**21 authentication-boundary cases**, with no failures, errors, or skips. All
+18 disposable projects passed scoped teardown and empty-resource checks;
+follow-up ownership-label listings were empty.
 
-The subsequent [authentication checkpoint](SECURITY_REVIEW.md) changes token
-validation and two dependency pins. Its Codespaces run passed 16 service cases,
-30 harness checks, and all 100 nested regressions, but failed one case when
-RabbitMQ could not read its cookie at startup. See the review for the saved
-evidence and the integration-health-check correction; that correction needs a
-new run. Update `.venv-integration` with `pip install -r app/requirements.txt`
-when dependency pins change. The passing result below applies to its recorded
-revision only.
+This evidence applies to `cd9c753d6ef8587fd7b9f15e3710c41c86cc7a22`. The
+[authentication review](SECURITY_REVIEW.md#passing-codespaces-rerun-after-the-health-check-correction)
+records the exact commands, saved manifest/JUnit summaries, and artifact path
+`/workspaces/Beacon/artifacts/integration/20261020T041411Z-2d56efdef10745068e92faef78dd44cf`.
+The runner exited 0; pytest reported **47 passed in 460.54 seconds**. The broker
+startup case passed after the health-check correction. Its previous failure and
+inferred cookie-ownership race remain documented separately in that review.
+
+The earlier passing baseline at `7894efd93fe003d157d8beed28d705fedac17729`
+(79 nested regressions) is recorded below; the first 70 passed / 8 skipped
+reliability result remains in [RELIABILITY.md](RELIABILITY.md). Update
+`.venv-integration` with `pip install -r app/requirements.txt` when dependency
+pins change. Each passing result validates its recorded revision only.
 
 ## Run
 
@@ -176,7 +181,7 @@ No dev-container rebuild or dependency reinstall is required for these Python
 changes; the runner builds the app image from the updated checkout. The harness
 collects 47 top-level cases: 30 harness checks and the same 17 service scenarios.
 
-## Passing Codespaces rerun on 2026-10-20
+## Passing baseline Codespaces rerun on 2026-10-20
 
 The rerun tested commit `7894efd93fe003d157d8beed28d705fedac17729`, confirmed
 by the saved `git rev-parse HEAD` command. The user supplied the terminal output
