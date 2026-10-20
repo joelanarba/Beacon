@@ -19,6 +19,7 @@ pythonpath = ["app"]
 asyncio_mode = "auto"
 testpaths = ["app/tests"]
 markers = [
+  "integration: starts a disposable Docker Compose project with real services",
   "redis: requires an explicitly configured disposable Redis instance",
   "rabbitmq: requires an explicitly configured disposable RabbitMQ broker",
 ]

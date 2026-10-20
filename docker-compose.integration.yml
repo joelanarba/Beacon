@@ -1,0 +1,113 @@
+# Invoked only by scripts/run_integration.py with an empty env file and unique -p.
+x-app: &app
+  image: ${BEACON_IT_IMAGE:?Use scripts/run_integration.py}
+  environment:
+    ENVIRONMENT: test
+    SECRET_KEY: isolated-integration-signing-key-never-for-deployment
+    DATABASE_URL: postgresql+asyncpg://beacon_test:integration-only@postgres:5432/beacon_test_e2e
+    REDIS_URL: redis://redis:6379/15
+    AMQP_URL: amqp://beacon_test:integration-only@rabbitmq:5672/
+    INGEST_SHARED_SECRET: ""
+    DOCS_ENABLED: "false"
+    SIMULATOR_ENABLED: "true"
+    METRICS_PUBLIC: "true"
+    CORS_ALLOWED_ORIGINS: ""
+    BROKER_TIMEOUT_SECONDS: "3"
+    OUTBOX_POLL_SECONDS: "0.1"
+    DELIVERY_MAX_RETRIES: "5"
+    DELIVERY_RETRY_BASE_SECONDS: "1"
+    DELIVERY_RETRY_MAX_SECONDS: "60"
+  labels:
+    com.beacon.integration.run: ${BEACON_IT_PROJECT:?Use the integration runner}
+
+services:
+  app:
+    <<: *app
+    build:
+      context: ./app
+      labels:
+        com.beacon.integration.image: "true"
+    command: ["python", "/opt/beacon-integration-entry.py"]
+    configs:
+      - source: integration-entry
+        target: /opt/beacon-integration-entry.py
+    ports:
+      - "127.0.0.1::8000"
+      - "127.0.0.1::9010"
+    # The harness deliberately starts this without broker dependency gating.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: beacon_test
+      POSTGRES_PASSWORD: integration-only
+      POSTGRES_DB: beacon_test_e2e
+    ports: ["127.0.0.1::5432"]
+    volumes: ["pg:/var/lib/postgresql/data"]
+    labels:
+      com.beacon.integration.run: ${BEACON_IT_PROJECT}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beacon_test -d beacon_test_e2e"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  redis:
+    image: redis:7.2-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports: ["127.0.0.1::6379"]
+    volumes: ["redis:/data"]
+    labels:
+      com.beacon.integration.run: ${BEACON_IT_PROJECT}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: beacon_test
+      RABBITMQ_DEFAULT_PASS: integration-only
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "+S 2:2"
+      RABBITMQ_CTL_ERL_ARGS: "+S 1:1"
+    ports: ["127.0.0.1::5672", "127.0.0.1::15672"]
+    volumes: ["rabbit:/var/lib/rabbitmq"]
+    labels:
+      com.beacon.integration.run: ${BEACON_IT_PROJECT}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+
+configs:
+  integration-entry:
+    file: ./integration_tests/worker_entry.py
+
+volumes:
+  pg:
+    labels:
+      com.beacon.integration.run: ${BEACON_IT_PROJECT}
+  redis:
+    labels:
+      com.beacon.integration.run: ${BEACON_IT_PROJECT}
+  rabbit:
+    labels:
+      com.beacon.integration.run: ${BEACON_IT_PROJECT}
+
+networks:
+  default:
+    labels:
+      com.beacon.integration.run: ${BEACON_IT_PROJECT}

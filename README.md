@@ -78,6 +78,12 @@ docker compose exec app python seed.py
 ```
 
 ### 4. Run Tests
+For automated disposable PostgreSQL, Redis, and RabbitMQ tests in Codespaces,
+see [the real-service test guide](docs/INTEGRATION_TESTING.md):
+```bash
+.venv-integration/bin/python scripts/run_integration.py
+```
+
 Run tests against explicitly configured disposable services as described in [docs/RELIABILITY.md](docs/RELIABILITY.md). With no test-service URLs configured, service-dependent tests are skipped:
 ```bash
 docker compose exec app pytest -q

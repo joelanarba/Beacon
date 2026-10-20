@@ -134,6 +134,11 @@ real broker restart behavior, live telecom delivery, or deployment correctness.
 
 ## Remaining evaluation work
 
+The disposable real-service harness is now implemented; see
+[INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) for Codespaces setup, coverage,
+commands, and the distinction between local harness checks and pending Docker
+execution. The verification table below remains the first-pass evidence.
+
 Real RabbitMQ outage/restart and consumer-kill runs, a complete service-stack smoke
 test, workload generators, priority-specific measurements, and the proposed
 experiments remain required. AWS deployment and performance results are not

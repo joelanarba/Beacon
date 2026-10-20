@@ -23,3 +23,7 @@ DEV_NOTES.md
 tasks/
 CLAUDE.md
 
+# Disposable integration runtime and command/result evidence.
+.venv-integration/
+artifacts/integration/
+
