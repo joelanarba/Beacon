@@ -66,9 +66,78 @@ Ruff passed for `app`, `integration_tests`, and the runner. Black checks passed;
 and dependency compatibility, not the absence of vulnerabilities. The final run
 emitted multipart-import and Starlette/AnyIO deprecation warnings.
 
-No new Docker build, Redis/RabbitMQ scenario, or remote CI execution has been
-verified for this checkpoint. The integration wrapper will also run the new
-authentication cases against its disposable PostgreSQL database.
+The subsequent Codespaces run below exercised the rebuilt image and real
+services, including the new authentication regressions. Its one broker-startup
+failure leaves full integration validation incomplete. Remote CI execution has
+not been verified.
+
+## Codespaces run: authentication passed, broker startup failed
+
+Tested revision: `70e49aa35dbd86d6906b5dc20d15ef72523a39bf`, confirmed by the
+saved command log. The user supplied terminal output and read-only summaries of
+the saved manifest, RabbitMQ service log/container state, nested JUnit report,
+and cleanup checks. Evidence remains in Codespaces at:
+
+```text
+/workspaces/Beacon/artifacts/integration/20261020T034819Z-92d35c9df44b4089bddb750b56210fb5
+```
+
+The user ran the pull, dependency-install, runner, and exit-status commands in
+the validation gate below. CPython was 3.11.13. The manifest records start
+`2026-10-20T03:48:19.212528+00:00`, finish
+`2026-10-20T03:56:32.315489+00:00`, `status=failed`, and exit code 1. Pytest
+reported 492.55 seconds.
+
+| Scope | Passed | Failed | Errors | Skipped | Not run |
+|---|---:|---:|---:|---:|---:|
+| Real-service scenarios | 16 | 1 | 0 | 0 | 0 |
+| Harness checks | 30 | 0 | 0 | 0 | 0 |
+| All top-level cases | 46 | 1 | 0 | 0 | 0 |
+| Nested application regressions | 100 | 0 | 0 | 0 | 0 |
+| Authentication-boundary subset of nested regressions | 21 | 0 | 0 | 0 | 0 |
+
+The failed case was
+`test_initial_broker_outage_and_worker_restart_preserve_accepted_work[stack0]`.
+It accepted a report with the broker absent and restarted the app, then failed
+in `Stack.recover("rabbitmq")`: the newly started broker exited before recovery
+assertions could run. RabbitMQ reported
+`Error when reading /var/lib/rabbitmq/.erlang.cookie: eacces` during prelaunch.
+Docker recorded `ExitCode=1` and `OOMKilled=false`. The first health probe began
+at `03:49:17.978897386Z`; the broker logged the cookie error at approximately
+`03:49:19.308Z`. This is a confirmed test-stack/environment startup failure,
+not a failed authentication assertion. It still makes the full run a failure.
+
+The integration health check invoked `rabbitmq-diagnostics` directly under the
+image's default root user. A root probe can create a restrictive root-owned cookie
+after the image entrypoint's ownership adjustment but before the broker creates
+its own cookie. This mechanism is an **inference** supported by the configuration,
+timing, and [upstream image discussion](https://github.com/docker-library/rabbitmq/discussions/696).
+The failed run did not capture file ownership; do not claim that it did.
+
+The scoped correction makes the health check wait for an existing nonempty cookie,
+then invokes diagnostics through `docker-entrypoint.sh`, which drops privileges
+for RabbitMQ commands. The [upstream entrypoint](https://github.com/docker-library/rabbitmq/blob/master/docker-entrypoint.sh)
+documents this dispatch. Cookie permissions, authentication, wait limits, and
+scenario assertions are unchanged. The broker and app images are not upgraded.
+No existing volume is deleted or manually repaired by the correction.
+
+Local follow-up checks passed: `python -m pytest -c pyproject.toml
+integration_tests/test_harness.py -q -p no:cacheprovider -p pytest_asyncio.plugin`
+reported **30 passed** in 3.65 seconds, with the multipart-import warning. The
+official standalone Compose v2.39.4 executable normalized the updated file with
+`--env-file <empty.env> -f docker-compose.integration.yml -p <generated-project>
+config --format json`; inspection confirmed the guarded health command and
+unchanged interval, timeout, and retry count. Diff checks passed. This offline
+configuration check requires no Docker daemon and is not runtime validation.
+
+All **18 scoped teardown commands succeeded**, and all 18 projects passed their
+subsequent empty-resource checks. Follow-up ownership-label listings contained no
+containers, volumes, or networks. No cleanup leak was observed. The trapped
+bcrypt version warning and the `crypt`/multipart import warnings are distinct
+from the broker's fatal cookie-permission error.
+
+The corrected health check still requires a new Codespaces run; no successful
+runtime test of that correction is claimed from this Windows environment.
 
 ## Codespaces validation gate
 

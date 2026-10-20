@@ -8,9 +8,13 @@ projects passed cleanup checks. The passing evidence below applies to commit
 70 passed / 8 skipped reliability result remain separate records.
 
 The subsequent [authentication checkpoint](SECURITY_REVIEW.md) changes token
-validation and two dependency pins. It requires a fresh Codespaces run: update
-`.venv-integration` with `pip install -r app/requirements.txt` before invoking
-the runner. The passing result below applies to its recorded revision only.
+validation and two dependency pins. Its Codespaces run passed 16 service cases,
+30 harness checks, and all 100 nested regressions, but failed one case when
+RabbitMQ could not read its cookie at startup. See the review for the saved
+evidence and the integration-health-check correction; that correction needs a
+new run. Update `.venv-integration` with `pip install -r app/requirements.txt`
+when dependency pins change. The passing result below applies to its recorded
+revision only.
 
 ## Run
 

@@ -87,7 +87,9 @@ services:
     labels:
       com.beacon.integration.run: ${BEACON_IT_PROJECT}
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      # A root CLI probe can create the cookie before the broker does. Wait for
+      # it, then use the image entrypoint's privilege drop for the diagnostics.
+      test: ["CMD-SHELL", "test -s /var/lib/rabbitmq/.erlang.cookie && exec docker-entrypoint.sh rabbitmq-diagnostics -q ping"]
       interval: 3s
       timeout: 5s
       retries: 60
