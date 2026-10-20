@@ -108,6 +108,39 @@ def test_evidence_redacts_jwts_and_connection_passwords():
     assert "sensitive" not in output and "eyJheader" not in output
 
 
+@pytest.mark.parametrize(
+    "service,bindings",
+    [
+        ("postgres", {"pg": (5432, 41001)}),
+        ("redis", {"redis": (6379, 41002)}),
+        ("rabbitmq", {"amqp": (5672, 41003), "management": (15672, 41004)}),
+        ("app", {"http": (8000, 41005), "control": (9010, 41006)}),
+    ],
+)
+@pytest.mark.parametrize("readiness", [True, False])
+async def test_recovery_refreshes_changed_ports_before_readiness(
+    tmp_path, monkeypatch, service, bindings, readiness
+):
+    stack = Stack(DockerRun(tmp_path))
+    stack.ports.update({key: 32000 for key in bindings})
+    monkeypatch.setattr(stack, "verify_ownership", lambda: None)
+    monkeypatch.setattr(stack, "compose", lambda *args, **kwargs: None)
+    published = {internal: port for internal, port in bindings.values()}
+    monkeypatch.setattr(stack, "port", lambda name, internal: published[internal])
+
+    expected = {key: port for key, (_, port) in bindings.items()}
+    checks = []
+
+    async def ready(*args):
+        checks.append(args)
+        assert {key: stack.ports[key] for key in bindings} == expected
+
+    monkeypatch.setattr(stack, "wait_http", ready)
+    await stack.recover(service, ready=readiness)
+    assert {key: stack.ports[key] for key in bindings} == expected
+    assert checks == ([("/ready", 200)] if readiness else [])
+
+
 async def test_fault_control_releases_all_held_deliveries_and_rearms():
     barrier = Barrier()
     async with httpx.AsyncClient(

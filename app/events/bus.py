@@ -33,6 +33,9 @@ class EventBus:
         self._connection: aio_pika.abc.AbstractRobustConnection | None = None
         self._channel: aio_pika.abc.AbstractRobustChannel | None = None
         self._exchange: aio_pika.abc.AbstractExchange | None = None
+        # aio-pika 9.4.1 tracks robust queues weakly. Keep their bindings and
+        # consumer callbacks alive so they can be restored after reconnecting.
+        self._queues: list[aio_pika.abc.AbstractQueue] = []
 
     @property
     def max_priority(self) -> int:
@@ -76,6 +79,7 @@ class EventBus:
             auto_delete=auto_delete,
             arguments={"x-max-priority": self._max_priority},
         )
+        self._queues.append(queue)
         for routing_key in routing_keys:
             await queue.bind(self._exchange, routing_key)
         return queue
@@ -115,3 +119,4 @@ class EventBus:
         if self._connection is not None:
             await self._connection.close()
             log.info("bus.closed")
+        self._queues.clear()

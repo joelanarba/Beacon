@@ -561,6 +561,12 @@ class Stack:
             service,
             timeout=240,
         )
+        # Docker may allocate new ephemeral host ports when a container starts
+        # again. Application peers use service DNS; controller probes use these.
+        if service == "postgres":
+            self.ports["pg"] = self.port("postgres", 5432)
+        if service == "redis":
+            self.ports["redis"] = self.port("redis", 6379)
         if service == "rabbitmq":
             self.broker_ports()
         if service == "app":
