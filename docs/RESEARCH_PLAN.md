@@ -1,11 +1,12 @@
 # Focused study: severity scheduling during backlog and broker recovery
 
-Status on 2026-10-20: **first Docker calibration invalid; corrected readiness
-probe awaiting a new calibration**. The isolated baseline, seeded workload,
-calibration gate, and analysis are implemented and checked locally. Two healthy
-calibration trials passed; two outage trials had an invalid broker recovery
-boundary. The forty-run measured study remains unrun; no scheduling improvement
-or novelty claim is established. Evidence and execution steps are in
+Status on 2026-10-21: **corrected Docker calibration and saved-evidence gate
+passed; ready to freeze settings**. All four trials and four separate warmups
+passed at `3e946b11cdcba3b7c20f4b55756014ee94c5d15a`, with mixed-class backlog,
+complete assignments, and all nine owned projects verified empty after cleanup.
+The first calibration remains invalid. The forty-run measured study remains
+unrun; no scheduling improvement or novelty claim is established. Evidence,
+observed send-time drift, and execution steps are in
 [RESEARCH_RUNNING.md](RESEARCH_RUNNING.md).
 The real-service correctness gate, including authentication, passed at
 `cd9c753d6ef8587fd7b9f15e3710c41c86cc7a22`; see
@@ -148,8 +149,8 @@ or exactly-once outcome in this experiment.
    timeline from the raw artifacts. Report negative and inconclusive results.
 
 The [execution guide](RESEARCH_RUNNING.md) provides the runner and artifact-only
-analysis commands, local validation evidence, and the unrun Docker gate. The
-runner rejects invalid configuration and reused output directories, returns
+analysis commands, local validation evidence, and the passing calibration gate.
+The runner rejects invalid configuration and reused output directories, returns
 nonzero on correctness/cleanup failure or an unobserved mixed-class backlog,
 and preserves invalid trials. Offline dry runs generate plans only. Four real
 calibration trials, each with a separate warmup, must pass before parameters
@@ -168,5 +169,5 @@ The research checkpoint is complete only when another developer can reproduce
 the pinned setup, execute the declared trials, regenerate the figures, and trace
 every reported number to retained raw observations and correctness checks. The
 report must explain the mechanism, fairness tradeoff, uncertainty, and limitations.
-Until then Beacon has a tested systems implementation and locally tested study
-tooling, not measured research results.
+Until then Beacon has a tested systems implementation and a passing real-service
+calibration; the repeated measured comparison and research report are unfinished.

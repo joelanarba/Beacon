@@ -1,9 +1,10 @@
 # Running the scheduling study
 
-Status on 2026-10-20: **first Docker calibration invalid; corrected broker
-readiness probe requires a new calibration**. Both healthy trials passed; both
-outage trials were invalidated by a premature recovery timestamp. The forty-run
-measured study has not started. The 17 passing incident-processing scenarios in
+Status on 2026-10-21: **corrected Docker calibration and saved-evidence gate
+passed; ready to freeze settings**. All four trials and four separate warmups
+passed, with nine successful, verified-empty project teardowns. The first
+calibration remains invalid. The forty-run measured study has not started.
+The 17 passing incident-processing scenarios in
 [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) validate the earlier correctness
 checkpoint, not this study launcher. The question, hypotheses, and limitations
 are in [RESEARCH_PLAN.md](RESEARCH_PLAN.md).
@@ -54,15 +55,38 @@ is a declared experimental control, not application processing work.
 
 ## Freeze and measured batch, after calibration review
 
-These commands are the next stage, not part of initial calibration:
+The corrected calibration below has passed review. In the same Codespace, use
+this block to analyze its saved artifacts, freeze its unchanged settings, and
+run the measured batch. Each attempt gets a fresh output directory. The block
+stops if pulling, calibration analysis, or freezing fails; it still analyzes a
+failed measured batch so invalid results remain visible.
 
 ```bash
-.venv-integration/bin/python -m experiments.run freeze "$STUDY_ROOT/calibration" --output "$STUDY_ROOT/frozen.json"
-.venv-integration/bin/python -m experiments.run run --frozen "$STUDY_ROOT/frozen.json" --output "$STUDY_ROOT/measured"
-echo "study_exit=$?"
-.venv-integration/bin/python -m experiments.analyze "$STUDY_ROOT/measured" --output "$STUDY_ROOT/measured-analysis"
-echo "analysis_exit=$?"
+(
+  set -e
+  git pull --ff-only origin main
+  CAL="artifacts/study/calibration-20261021T020432Z"
+  BATCH="artifacts/study/batch-$(date -u +%Y%m%dT%H%M%SZ)"
+  printf 'study_directory=%s\n' "$BATCH"
+  .venv-integration/bin/python -m experiments.analyze "$CAL" --output "$BATCH/calibration-analysis"
+  .venv-integration/bin/python -m experiments.run freeze "$CAL" --output "$BATCH/frozen.json"
+  set +e
+  .venv-integration/bin/python -m experiments.run run --frozen "$BATCH/frozen.json" --output "$BATCH/measured"
+  study_exit=$?
+  printf 'study_exit=%s\n' "$study_exit"
+  .venv-integration/bin/python -m experiments.analyze "$BATCH/measured" --output "$BATCH/measured-analysis"
+  analysis_exit=$?
+  printf 'analysis_exit=%s\n' "$analysis_exit"
+  exit "$((study_exit || analysis_exit))"
+)
 ```
+
+No dependency reinstall or calibration rerun is needed for this reviewed
+checkpoint. Documentation-only changes do not affect the source fingerprint;
+the runner checks the hashed application, study, and harness inputs. Paste the
+printed directory, trial summaries, and both exit codes after completion, then
+review the saved manifest, raw evidence, class results, paired comparisons, and
+cleanup before interpreting the measured study.
 
 The freeze step rechecks all four calibration trials, separate warmups, raw-file
 hashes, priorities, completion, observed backlog, invariants, and cleanup. It
@@ -215,9 +239,9 @@ these failures.
 All **nine** owned projects (one build, four warmups, four calibration trials)
 completed scoped teardown and subsequent empty-resource checks. Follow-up
 ownership-label listings contained no containers, volumes, or networks; no
-owned data-resource leak was observed. Retain the complete invalid run and use
-a new output directory for all four corrected calibration trials. Do not freeze
-this run or start the forty-trial batch yet.
+owned data-resource leak was observed. Retain the complete invalid run. This
+run is ineligible for freezing; the subsequent corrected calibration is recorded
+below.
 
 Local correction validation on CPython 3.11.17 reported **71 passed**, with zero
 failures, errors, or skips, in 47.44 seconds: 41 study checks plus the existing
@@ -233,8 +257,79 @@ Ruff, Black, Python 3.11 syntax parsing, diff checks, and offline normalization
 of both generated Compose configurations passed. Probe interval, timeout, and
 retry count match the inherited values. These local checks use scripted CLI
 responses, not a live RabbitMQ restart; Docker remains unavailable on the local
-host. Corrected Codespaces calibration has not run. The saved original run
-remains invalid and is not eligible for freezing or performance claims.
+host. The subsequent Codespaces rerun is recorded below. The saved original
+run remains invalid and is not eligible for freezing or performance claims.
+
+## Corrected Codespaces calibration: passed on 2026-10-21
+
+Tested revision: `3e946b11cdcba3b7c20f4b55756014ee94c5d15a`, confirmed by the
+saved Git command. Evidence remains in the user's Codespace:
+
+```text
+/workspaces/Beacon/artifacts/study/calibration-20261021T020432Z
+```
+
+The user supplied the runner output and a read-only saved-evidence check using
+`experiments.run.validate_calibration`. The runner exited zero, the manifest
+reported `passed`, and the raw-evidence gate returned `PASS` under CPython
+3.11.13. This review uses those supplied summaries; the remote artifacts were
+not copied to or rerun on the local Windows host. The gate rechecked source and
+trial plans, paired traces, raw-file hashes, priorities, completion, recorded invariants,
+observed backlog, sampling boundaries, and separate warmup cleanup.
+
+| Scope | Passed | Invalid | Failed | Skipped | Not run |
+|---|---:|---:|---:|---:|---:|
+| Healthy calibration trials | 2 | 0 | 0 | 0 | 0 |
+| Broker-outage calibration trials | 2 | 0 | 0 | 0 | 0 |
+| Separate warmups | 4 | 0 | 0 | 0 | 0 |
+| Forty-run measured batch | 0 | 0 | 0 | 0 | 40 |
+
+All four calibration trials submitted, acknowledged, and completed 160 reports
+each: 40 CRITICAL and 120 STANDARD, with no censored, unresolved, or dead-lettered
+reports. All four separate warmups completed eight of eight reports. Mixed-class
+backlog was observed in every trial and warmup. No correctness, environment, or
+unexpected sampling failure was reported by the gate.
+
+| Condition / policy | Input finished (s) | Completion observed (s) | Drain deadline (s) | Maximum send drift (s) | Queue/resource error samples |
+|---|---:|---:|---:|---:|---:|
+| Healthy / equal | 3.480647 | 21.575575 | 123.480647 | 1.778550 | 0 |
+| Healthy / severity | 3.605311 | 20.923872 | 123.605311 | 1.870813 | 0 |
+| Broker outage / equal | 4.549300 | 41.088741 | 124.549300 | 2.747148 | 3 |
+| Broker outage / severity | 4.344919 | 36.637948 | 124.344919 | 2.499051 | 2 |
+
+Times are controller elapsed seconds from each trial's origin. The five error
+samples occurred during intervals overlapping the injected outage and passed
+the unchanged boundary check. Resource errors and queue errors outside that
+window would invalidate a trial. The supplied fault timeline was:
+
+| Policy | Stop requested (s) | Stopped (s) | Restart requested (s) | Application healthy observed (s) |
+|---|---:|---:|---:|---:|
+| Equal | 1.434434 | 4.426924 | 7.428127 | 22.491177 |
+| Severity | 1.245493 | 4.173447 | 7.175022 | 22.872046 |
+
+The settings are eligible for freezing unchanged: 160 reports, nominal 10 ms
+trace spacing, concurrency 16, no artificial dispatch delay, prefetch one,
+120-second post-input drain, three-second stopped hold, database sampling at
+0.25 seconds, service sampling at two seconds, and order seed 20261020. These
+are finite bursts with substantial observed scheduling drift, not a demonstrated
+steady 100 requests/second arrival rate. Retain actual send/ack times and report
+drift in the measured analysis. No setting was selected from the latency
+difference between policies; the eligibility checks passed with the existing
+defaults. There is only one calibration seed pair per condition, so this record
+does not establish a scheduling benefit or uncertainty across repetitions.
+
+All nine owned projects (one build, four warmups, four trials) had successful
+scoped teardown and empty container/volume/network checks: **9 / 9 / 9**.
+Follow-up ownership-label listings were empty. No owned data-resource leak was
+observed; retained images/build cache and evidence are intentional. Artifact-only
+plot generation, freezing, and the forty-run measured batch remain unrun for
+this calibration at this checkpoint. The smallest justified next step is the
+freeze-and-batch block above; no application or study-code fix is indicated.
+
+This documentation checkpoint passed local diff checks, relative-link checks,
+and Bash syntax validation of the freeze-and-batch block. Only four Markdown
+files changed; hashed study inputs are unchanged. No application tests or Docker
+trials were rerun for the documentation update.
 
 ## Local verification and unrun work
 

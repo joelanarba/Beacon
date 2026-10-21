@@ -161,10 +161,14 @@ It also preserves the intervening RabbitMQ cookie-permission startup failure and
 the scoped integration-health-check correction tested by that rerun. The
 [focused research plan](RESEARCH_PLAN.md) defines the proposed scheduling
 comparison; [RESEARCH_RUNNING.md](RESEARCH_RUNNING.md) documents its isolated
-runner and artifact-only analysis. The first calibration passed two healthy
-trials and invalidated two outage trials due to the study's premature broker
-readiness boundary. Corrected calibration and the forty-run measured study
-remain unrun; no scheduling improvement has been established.
+runner and artifact-only analysis. On 2026-10-21, corrected calibration at
+`3e946b11cdcba3b7c20f4b55756014ee94c5d15a` passed all four trials and four
+separate warmups, including the saved raw-evidence gate. All 640 calibration
+reports completed without censoring, unresolved work, or dead letters, and all
+nine owned projects were verified empty after cleanup. The first calibration
+remains invalid due to its premature broker readiness boundary. Observed
+send-time drift is documented; the forty-run measured study remains unrun and
+no scheduling improvement has been established.
 
 ## Verification on 2026-10-19
 
