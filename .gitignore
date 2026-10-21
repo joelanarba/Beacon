@@ -1,30 +1,54 @@
+# Local credentials and configuration
 .env
 .env.*
+!.env.example
 *.pem
 *.key
+docker-compose.override.yml
+
+# Environments, caches, and test output
+.venv/
+.venv-*/
+venv/
 __pycache__/
 *.py[cod]
-.venv/
-venv/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.coverage*
+htmlcov/
+*.log
+artifacts/
+benchmarks/results/
+
+# Local databases and infrastructure state
+*.db
+*.sqlite
+*.sqlite3
+dump.rdb
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfplan
+
+# Editor settings and private notes
 .vscode/
 .idea/
 .DS_Store
-benchmarks/results/
-*.log
-docker-compose.override.yml
-
-# Local-only dev notes / personal runbook
 DEV_NOTES.md
-
-# Local planning / scratch notes
 tasks/
-CLAUDE.md
+.worktrees/
 
-# Disposable integration runtime and command/result evidence.
-.venv-integration/
-artifacts/integration/
-artifacts/study/
+# Local coding-tool instructions and state
+AGENTS.md
+CLAUDE.md
+CODEX.md
+GEMINI.md
+.agents/
+.claude/
+.codex/
+.cursor/
+.aider*
+.github/copilot-instructions.md
 

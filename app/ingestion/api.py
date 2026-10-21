@@ -1,4 +1,4 @@
-"""Ingestion API — the convergence point of the three channels.
+"""Ingestion API - the convergence point of the three channels.
 
 ``/ingest/app``, ``/ingest/ussd`` and ``/ingest/sms`` are the provider-facing
 webhooks. Each drives its channel adapter, and all three converge to ONE
@@ -130,7 +130,7 @@ async def _ussd_session_alive(
             return True
         # A continuation refreshes the window iff the session still exists.
         return bool(await rc.expire(key, ttl))
-    except Exception as exc:  # noqa: BLE001 — fail-open is intentional
+    except Exception as exc:  # noqa: BLE001 - fail-open is intentional
         log.warning("ussd.redis_unavailable", error=str(exc))
         return True
 
@@ -138,7 +138,7 @@ async def _ussd_session_alive(
 async def _ussd_clear(rc: redis.Redis, key: str) -> None:
     try:
         await rc.delete(key)
-    except Exception as exc:  # noqa: BLE001 — non-critical cleanup
+    except Exception as exc:  # noqa: BLE001 - non-critical cleanup
         log.warning("ussd.redis_cleanup_failed", error=str(exc))
 
 
@@ -234,6 +234,6 @@ async def ingest_sms(
             f"Ref: {_ref(result.incident_id)}. Help is being arranged."
         )
 
-    # Unparseable — reply with the keyword format, persist nothing.
+    # Unparseable - reply with the keyword format, persist nothing.
     log.info("sms.unparseable", sender=raw["from"])
     return PlainTextResponse(result.reply)

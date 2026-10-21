@@ -1,6 +1,6 @@
 """Dispatcher-facing incident endpoints (authenticated).
 
-A dispatcher advances an incident through its lifecycle (ASSIGNED → EN_ROUTE →
+A dispatcher advances an incident through its lifecycle (ASSIGNED -> EN_ROUTE ->
 RESOLVED). Each transition writes an ``EventLog`` row and publishes the matching
 ``incident.<status>`` event, which the notification consumer propagates live to
 every connected dispatcher. Resolving an incident also frees the responder and

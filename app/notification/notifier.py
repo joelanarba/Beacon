@@ -3,13 +3,13 @@
 Beacon reaches each recipient on a channel they can actually use, instead of
 assuming everyone has data. Fan-out is keyed on each party's reach:
 
-- dispatchers sit at a data console        → WebSocket hub
-- an app responder                          → WebSocket hub (responder role)
-- a feature-phone responder (reachable=SMS) → SMS-out via the provider sink
+- dispatchers sit at a data console        -> WebSocket hub
+- an app responder                          -> WebSocket hub (responder role)
+- a feature-phone responder (reachable=SMS) -> SMS-out via the provider sink
 
-The consumer binds ``incident.assigned`` (→ notify the responder + dispatchers)
+The consumer binds ``incident.assigned`` (-> notify the responder + dispatchers)
 and the status routing keys ``incident.en_route`` / ``incident.resolved``
-(→ propagate to dispatchers).
+(-> propagate to dispatchers).
 """
 
 from __future__ import annotations

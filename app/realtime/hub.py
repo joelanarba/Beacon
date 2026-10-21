@@ -2,7 +2,7 @@
 
 The hub is an in-process registry of live WebSocket connections keyed by role.
 This is the one place a module-level structure is correct rather than Redis: a
-WebSocket is a live socket handle bound to *this* worker — it cannot be
+WebSocket is a live socket handle bound to *this* worker - it cannot be
 serialised or shared across processes. (For multi-worker broadcast you'd bridge
 workers with Redis pub/sub; single-worker here, so the registry is local. That's
 future work, noted in the README.)
@@ -64,7 +64,7 @@ class ConnectionHub:
             try:
                 await ws.send_json(message)
                 sent += 1
-            except Exception:  # noqa: BLE001 — a broken socket must not stop fan-out
+            except Exception:  # noqa: BLE001 - a broken socket must not stop fan-out
                 dead.append(ws)
 
         if dead:

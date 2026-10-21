@@ -1,5 +1,5 @@
 """
-SMS channel — async, store-and-forward, minimal capability.
+SMS channel - async, store-and-forward, minimal capability.
 
 Inbound SMS is the lowest rung of the connectivity gradient: a single
 store-and-forward text on the GSM signaling channel, no session, no GPS. A real
@@ -8,7 +8,7 @@ mirrors that exact shape.
 
 Parse contract: a leading keyword selects the emergency type, and the remaining
 free text becomes the description. Unparseable input (no recognised keyword)
-yields a ``PartialSession`` carrying a helpful reply and emits NO incident — the
+yields a ``PartialSession`` carrying a helpful reply and emits NO incident - the
 same "reply, don't dispatch" shape USSD uses for a terminal prompt.
 
     FIRE  Tema community 5 market ablaze   ->  FIRE,     desc="Tema community ..."
@@ -60,7 +60,7 @@ class SMSChannel(Channel):
         keyword, _, remainder = body.partition(" ")
         etype = _KEYWORDS.get(keyword.upper())
         if etype is None:
-            # No recognised keyword — ask for the format, emit nothing.
+            # No recognised keyword - ask for the format, emit nothing.
             return PartialSession(sender, _HELP_REPLY, done=True)
 
         description = remainder.strip() or f"{etype.value} emergency (no detail given)"

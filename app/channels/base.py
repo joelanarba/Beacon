@@ -7,8 +7,8 @@ present or absent on the event, not as a different downstream code path, so the
 dispatch engine consumes IncidentEvent and stays channel-agnostic.
 
 A channel parse can yield one of two things:
-- ``IncidentEvent``   — a complete report, ready to publish to the bus.
-- ``PartialSession``  — more input is needed (USSD menu walk in progress);
+- ``IncidentEvent``   - a complete report, ready to publish to the bus.
+- ``PartialSession``  - more input is needed (USSD menu walk in progress);
                         carries the reply to send back to the user.
 """
 
@@ -21,7 +21,7 @@ from enum import Enum
 
 
 class Severity(str, Enum):
-    """Triage severity. Ordering matters — see numeric_priority()."""
+    """Triage severity. Ordering matters - see numeric_priority()."""
 
     CRITICAL = "CRITICAL"
     URGENT = "URGENT"

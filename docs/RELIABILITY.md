@@ -61,7 +61,7 @@ Worker settings are environment variables with these defaults:
 
 ## Ingestion identities
 
-- App clients can supply `Idempotency-Key` with 1–128 characters.
+- App clients can supply `Idempotency-Key` with 1-128 characters.
 - SMS callbacks can supply the same header or a provider `id` / `messageId` form
   field. The header takes precedence.
 - USSD uses its session ID. A completed callback can replay its acknowledgement
@@ -132,93 +132,24 @@ publication failure, retry/dead-letter handoff, and initial broker setup recover
 Mocked broker/Redis boundaries are identified in tests; they do not establish
 real broker restart behavior, live telecom delivery, or deployment correctness.
 
-## Remaining evaluation work
+## Recorded verification
 
-The disposable real-service harness is now implemented; see
-[INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) for Codespaces setup, coverage,
-commands, failed-run diagnosis, and the passing Codespaces rerun. On 2026-10-20,
-the latest reviewed commit `cd9c753d6ef8587fd7b9f15e3710c41c86cc7a22` passed all
-17 real-service scenarios and 30 harness checks. Its nested regression report
-passed 100 tests, including 21 authentication-boundary cases. There were zero
-failures, errors, skips, or unrun scenarios. All 18 disposable projects passed
-scoped teardown and subsequent empty-resource checks; follow-up ownership-label
-listings were empty. The guide preserves the earlier passing baseline at
-`7894efd93fe003d157d8beed28d705fedac17729` with 79 nested regressions. The
-verification table below remains the separate first-pass evidence from 2026-10-19.
+The Codespaces correctness run at `cd9c753` passed all 17 real-service scenarios,
+30 harness checks, and 100 nested regressions, including 21 authentication cases.
+All 18 disposable projects passed teardown and empty-resource checks. The suite
+covers the complete incident path with simulated SMS, concurrent resource use,
+worker kills, broker recovery, retries, and dead-letter handling.
 
-This run covers real RabbitMQ interruption/reconnection, worker kills, service
-retries, and the complete incident path using simulated SMS. Workload generators,
-priority-specific measurements, and the proposed experiments remain outstanding.
-Live telecom, AWS deployment, capacity, and performance are not established by
-this correctness suite. The wider audit's authentication, dependency-security,
-location, and notification findings also remain open unless explicitly covered
-by these tests. No further application fix is indicated by the passing run.
+The separate scheduling batch at `4304151` passed forty trials and forty
+warmups. All 6400 measured reports completed assignment, with no unresolved work
+or dead letters. All eighty batch projects were verified empty after cleanup.
+[RESEARCH_RESULTS.md](RESEARCH_RESULTS.md) reports the CRITICAL latency benefit,
+STANDARD outage cost, recovery observations, uncertainty, and send-time drift.
+Assignment is the study's completion endpoint.
 
-The [authentication review](SECURITY_REVIEW.md) records the corrected
-refresh-token race, dispatcher WebSocket role checks, required JWT claims,
-dependency changes, local validation, and the latest passing real-service run.
-It also preserves the intervening RabbitMQ cookie-permission startup failure and
-the scoped integration-health-check correction tested by that rerun. The
-[focused research plan](RESEARCH_PLAN.md) defines the proposed scheduling
-comparison; [RESEARCH_RUNNING.md](RESEARCH_RUNNING.md) documents its isolated
-runner and artifact-only analysis. On 2026-10-21, corrected calibration at
-`3e946b11cdcba3b7c20f4b55756014ee94c5d15a` passed all four trials and four
-separate warmups, including the saved raw-evidence gate. All 640 calibration
-reports completed without censoring, unresolved work, or dead letters, and all
-nine owned projects were verified empty after cleanup. The first calibration
-remains invalid due to its premature broker readiness boundary. Observed
-send-time drift is documented. The subsequent forty-trial measured batch at
-`4304151015775f6baa3c962f86af074cfe432bdf` passed its saved-evidence checks:
-6400 measured reports and 320 separate warmup reports completed, with no
-unresolved work or dead letters, and all eighty owned projects were verified
-empty after cleanup. [RESEARCH_RESULTS.md](RESEARCH_RESULTS.md) records the
-bounded CRITICAL latency benefit, STANDARD outage cost, and recovery limitations.
-These study outcomes use database assignment as the completion endpoint.
-
-## Verification on 2026-10-19
-
-Validation used CPython 3.11.17 with the existing pinned application requirements
-in a separate temporary environment, and a disposable localhost PostgreSQL 16.15
-instance. The development database, local `.env`, and existing `.venv` were not
-modified. Each PostgreSQL test applied the versioned migrations to its own schema.
-
-| Check | Result |
-|---|---|
-| `python -m pytest -q -p no:cacheprovider` with the test PostgreSQL URL | 70 passed, 8 skipped; 75.14 seconds |
-| Targeted legacy-upgrade and integrity suite | 20 passed |
-| Pinned Ruff, `ruff check --no-cache app` | Passed |
-| Pinned Black, `black --check` on the 32 changed/new Python files | Passed |
-| `git diff --check` | Passed |
-| Python 3.11 grammar parsing of 61 Python files; YAML/JSON/TOML parsing | Passed |
-
-The eight skips require real Redis or RabbitMQ. Tests that mock those boundaries
-do not replace those integration checks. The suite emitted one Starlette/AnyIO
-deprecation warning. Docker build/startup, broker restart, live telecom, AWS,
-GitHub Actions execution, and performance experiments were not verified.
-
-The implementation also fixes an application-import assertion caused by the
-logout route's HTTP 204 response declaration, and replaces `.local` demo/test
-email addresses with validation-compatible documentation-domain addresses.
-
-Files changed by this pass:
-
-- Integrity: `app/models/db.py`,
-  `app/alembic/versions/20261019_0002_delivery_integrity.py`,
-  `app/incidents/api.py`, `app/dispatch/engine.py`,
-  `app/dispatch/responder_matcher.py`, and `app/dispatch/hospital_matcher.py`.
-- Acceptance/recovery: `app/incidents/acceptance.py`, `app/ingestion/api.py`,
-  `app/events/outbox.py`, `app/events/worker.py`, `app/events/bus.py`,
-  `app/events/audit.py`, and `app/notification/notifier.py`.
-- Startup/configuration: `app/main.py`, `app/config.py`,
-  `app/auth/router.py`, and `app/auth/middleware.py`.
-- Demo/test isolation: `app/seed.py`, `app/sim/provider.py`, and
-  `app/sim/static/harness.html`.
-- Verification infrastructure: `app/alembic/env.py`, `.github/workflows/ci.yml`,
-  `pyproject.toml`, and `app/tests/conftest.py`.
-- New regression modules: `app/tests/test_delivery.py`,
-  `app/tests/test_integrity.py`, and `app/tests/test_migrations.py`.
-- Existing tests: `app/tests/test_auth_flow.py`, `app/tests/test_bus_priority.py`,
-  `app/tests/test_dispatch.py`, `app/tests/test_health.py`,
-  `app/tests/test_incidents.py`, `app/tests/test_ingestion.py`,
-  `app/tests/test_notify.py`, and `app/tests/test_security.py`.
-- Documentation: `README.md` and `docs/RELIABILITY.md`.
+[VALIDATION_HISTORY.md](VALIDATION_HISTORY.md) records earlier failures,
+corrections, test counts, evidence directories, and local-only checks. The
+[integration guide](INTEGRATION_TESTING.md) contains setup and coverage. The
+[security review](SECURITY_REVIEW.md) separates corrected authentication findings
+from remaining work. Recorded runs validate their own revisions; later comment,
+label, or documentation edits are not fresh Docker executions.

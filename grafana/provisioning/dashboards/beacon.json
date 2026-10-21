@@ -1,6 +1,6 @@
 {
   "uid": "beacon-overview",
-  "title": "Beacon — Emergency Coordination",
+  "title": "Beacon - Emergency Coordination",
   "tags": ["beacon"],
   "timezone": "browser",
   "schemaVersion": 39,
@@ -50,7 +50,7 @@
     {
       "id": 3,
       "type": "timeseries",
-      "title": "Dispatch latency — report to assignment (p95, s)",
+      "title": "Dispatch latency - report to assignment (p95, s)",
       "datasource": { "type": "prometheus", "uid": "beaconprom" },
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
       "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },

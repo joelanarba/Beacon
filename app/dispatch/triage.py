@@ -1,4 +1,4 @@
-"""Triage: severity → bus priority, and emergency type → who responds.
+"""Triage: severity -> bus priority, and emergency type -> who responds.
 
 Severity already knows its own numeric priority (``Severity.numeric_priority``);
 this module is the single place the dispatch side reads it, plus the mapping from

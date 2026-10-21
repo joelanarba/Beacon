@@ -1,14 +1,7 @@
-"""
-App channel — the rich data channel (top of the connectivity gradient).
+"""Normalize an app report into a complete IncidentEvent.
 
-A smartphone/web client on mobile data can fill the whole ``IncidentEvent``:
-precise GPS, a media URL, a stable contact. It always produces a *complete*
-event in one shot (no session walk), so ``parse`` never returns a
-``PartialSession``.
-
-The raw input is already validated upstream by the ``IngestAppRequest`` pydantic
-contract; this channel just normalises it into the shared ``IncidentEvent`` so
-the dispatch engine stays channel-agnostic.
+HTTP validation happens in IngestAppRequest. App reports provide the required
+fields in one request, so this channel does not create a partial session.
 """
 
 from __future__ import annotations

@@ -1,8 +1,4 @@
-"""structlog (JSON) configuration — ported from the Adaptive Gateway.
-
-Emit one JSON line per event on stdout; never use bare ``print``. Call
-``configure_logging()`` once at process start (see ``main.py``).
-"""
+"""Write structured JSON logs to stdout using structlog."""
 
 from __future__ import annotations
 

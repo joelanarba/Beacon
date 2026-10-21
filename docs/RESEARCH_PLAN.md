@@ -170,7 +170,7 @@ The research checkpoint is complete only when another developer can reproduce
 the pinned setup, execute the declared trials, regenerate the figures, and trace
 every reported number to retained raw observations and correctness checks. The
 report must explain the mechanism, fairness tradeoff, uncertainty, and limitations.
-The first controlled batch and supplied raw/table-analysis checks have completed;
+The first controlled batch and exported evidence and analysis checks have completed;
 their findings and limitations are recorded in [RESEARCH_RESULTS.md](RESEARCH_RESULTS.md).
 Evidence backup, visual inspection of the original remote figures, and independent
 reproduction remain unverified. Broader research claims still require that work

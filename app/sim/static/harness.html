@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Beacon — Provider Simulator & Dispatch Demo</title>
+  <title>Beacon - Provider simulator</title>
   <style>
     :root {
       --bg: #0e1014; --panel: #171a21; --ink: #e8eaed; --muted: #9aa0aa;
@@ -70,16 +70,16 @@
 </head>
 <body>
   <header>
-    <h1>📡 Beacon — Provider Simulator &amp; Dispatch Demo</h1>
+    <h1>Beacon - Provider simulator</h1>
     <p>Drives the same <code>/ingest/ussd</code> and <code>/ingest/sms</code> webhooks a real gateway
-       (Africa's Talking) would call — no mobile data required. File a report on the
+       would call. Submit a report on the
        left, watch it dispatched live on the right.</p>
   </header>
 
   <main>
     <!-- USSD -->
     <section class="panel">
-      <h2>📞 USSD session <span class="muted">— dial *920#</span></h2>
+      <h2>USSD session <span class="muted">- dial *920#</span></h2>
       <label>Phone number</label>
       <input id="ussd-phone" value="+233200000111" />
       <div class="row">
@@ -91,13 +91,13 @@
         <input id="ussd-input" placeholder="e.g. 1  then  Osu  then  1" />
         <button id="ussd-send">Send</button>
       </div>
-      <div id="ussd-screen" class="screen muted">Press “Dial *920#” to begin.</div>
+      <div id="ussd-screen" class="screen muted">Press 'Dial *920#' to begin.</div>
       <div class="muted" id="ussd-meta"></div>
     </section>
 
     <!-- SMS -->
     <section class="panel">
-      <h2>✉️ Inbound SMS</h2>
+      <h2>Inbound SMS</h2>
       <label>From (phone number)</label>
       <input id="sms-from" value="+233200000222" />
       <label>Message (start with FIRE / MED / SECURITY / HELP)</label>
@@ -108,19 +108,19 @@
 
     <!-- Dispatcher live feed -->
     <section class="panel">
-      <h2>🖥️ Dispatcher live feed <span id="ws-status" class="muted"><span class="dot off"></span>connecting…</span></h2>
+      <h2>Dispatcher live feed <span id="ws-status" class="muted"><span class="dot off"></span>connecting...</span></h2>
       <p class="muted">Live WebSocket from <code>/ws/dispatch</code> (auto-login as the seeded
         dispatcher). Assignments and status changes stream in as they happen.</p>
       <div class="row">
         <button id="feed-reconnect" class="ghost">Reconnect</button>
         <button id="feed-clear" class="ghost">Clear</button>
       </div>
-      <ul id="feed" class="feed"><li class="muted">No events yet — file a report.</li></ul>
+      <ul id="feed" class="feed"><li class="muted">No events yet - file a report.</li></ul>
     </section>
 
     <!-- Outbound sink -->
     <section class="panel">
-      <h2>📤 Outbound SMS sink</h2>
+      <h2>Outbound SMS sink</h2>
       <p class="muted">What the gateway would deliver to feature-phone responders.</p>
       <div class="row">
         <button id="out-refresh" class="ghost">Refresh</button>
@@ -154,7 +154,7 @@
       const tag = isEnd ? '<span class="tag end">END</span>'
                 : isCon ? '<span class="tag con">CON</span>' : "";
       screen.innerHTML = tag + "\n" + reply.replace(/^((CON)|(END)) /, "");
-      $("ussd-meta").textContent = `session ${ussd.sessionId ?? "—"} · text="${ussd.text}"`;
+      $("ussd-meta").textContent = `session ${ussd.sessionId ?? "-"} | text="${ussd.text}"`;
       if (isEnd) ussd.sessionId = null;
     }
 
@@ -168,7 +168,7 @@
     $("ussd-reset").onclick = () => {
       ussd = { sessionId: null, text: "" };
       $("ussd-screen").className = "screen muted";
-      $("ussd-screen").textContent = "Press “Dial *920#” to begin.";
+      $("ussd-screen").textContent = "Press 'Dial *920#' to begin.";
       $("ussd-meta").textContent = "";
     };
     $("ussd-send").onclick = async () => {
@@ -227,22 +227,22 @@
       const t = new Date().toLocaleTimeString();
       if (ev.type === "incident.assigned") {
         pushFeed(
-          `<div><span class="hl">ASSIGNED</span> ${ev.severity} · ${ev.source_channel}</div>` +
-          `<div>→ ${ev.responder_name}${ev.hospital_name ? " · " + ev.hospital_name : ""}` +
-          `${ev.match_radius_m != null ? " · " + Math.round(ev.match_radius_m) + " m" : ""}</div>` +
-          `<div class="ts">incident ${ev.incident_id.slice(0, 8)} · ${t}</div>`,
+          `<div><span class="hl">ASSIGNED</span> ${ev.severity} | ${ev.source_channel}</div>` +
+          `<div>-> ${ev.responder_name}${ev.hospital_name ? " | " + ev.hospital_name : ""}` +
+          `${ev.match_radius_m != null ? " | " + Math.round(ev.match_radius_m) + " m" : ""}</div>` +
+          `<div class="ts">incident ${ev.incident_id.slice(0, 8)} | ${t}</div>`,
           ev.severity
         );
       } else if (ev.type === "incident.status") {
         pushFeed(
           `<div><span class="hl">${ev.status}</span></div>` +
-          `<div class="ts">incident ${ev.incident_id.slice(0, 8)} · ${t}</div>`
+          `<div class="ts">incident ${ev.incident_id.slice(0, 8)} | ${t}</div>`
         );
       }
     }
 
     async function connectFeed() {
-      setStatus(false, "logging in…");
+      setStatus(false, "logging in...");
       let token;
       try {
         const res = await fetch("/auth/login", {
@@ -252,7 +252,7 @@
         if (!res.ok) throw new Error("login " + res.status);
         token = (await res.json()).access_token;
       } catch (e) {
-        setStatus(false, "login failed — run seed.py");
+        setStatus(false, "login failed - run seed.py");
         return;
       }
       if (socket) { try { socket.close(); } catch (_) {} }

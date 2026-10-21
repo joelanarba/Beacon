@@ -113,7 +113,7 @@ async def test_status_change_propagates_over_websocket():
 
 
 # --------------------------------------------------------------------------- #
-# WebSocket endpoint (handshake + auth) — sync TestClient
+# WebSocket endpoint (handshake + auth) - sync TestClient
 # --------------------------------------------------------------------------- #
 def test_ws_dispatch_accepts_valid_token():
     token = create_access_token("user-1", extra={"role": "DISPATCHER"})

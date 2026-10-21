@@ -1,10 +1,4 @@
-"""Application settings (pydantic-settings) + severity/channel config.
-
-Ported from the Adaptive Gateway pattern: a single cached ``Settings`` object,
-populated from environment variables (and ``.env`` for local/host runs). Inside
-docker compose the variables arrive via ``env_file: .env`` as real env vars, so
-the file itself need not be present in the image.
-"""
+"""Load and cache application settings from environment variables or .env."""
 
 from __future__ import annotations
 

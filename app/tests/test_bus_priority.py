@@ -95,7 +95,7 @@ async def test_critical_dequeued_before_waiting_standard():
     )
     try:
         # STANDARD enqueued first; CRITICAL second. Both sit in the queue before
-        # we pull, so priority ordering — not arrival order — decides.
+        # we pull, so priority ordering - not arrival order - decides.
         await bus.publish(
             routing_key,
             _payload(Severity.STANDARD),
@@ -117,7 +117,7 @@ async def test_critical_dequeued_before_waiting_standard():
     finally:
         try:
             await queue.delete(if_unused=False, if_empty=False)
-        except Exception:  # noqa: BLE001 — best-effort cleanup
+        except Exception:  # noqa: BLE001 - best-effort cleanup
             pass
         await bus.close()
 

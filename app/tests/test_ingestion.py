@@ -95,7 +95,7 @@ async def test_ingest_sms_malformed_persists_nothing(client, db_session):
 
 
 # --------------------------------------------------------------------------- #
-# USSD — full walk + timeout
+# USSD - full walk + timeout
 # --------------------------------------------------------------------------- #
 @pytest.mark.redis
 async def test_ingest_ussd_full_walk_persists(client, db_session):

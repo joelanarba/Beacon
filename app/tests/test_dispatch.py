@@ -1,5 +1,5 @@
 """Dispatch engine (DB + Redis): nearest available responder, hospital capacity
-respected, and the no-responder path stays graceful. No RabbitMQ here —
+respected, and the no-responder path stays graceful. No RabbitMQ here -
 ``dispatch_incident`` is factored to be bus-free so the matching logic unit-tests
 directly. Broker dequeue order is checked separately in test_bus_priority.py.
 """
@@ -105,7 +105,7 @@ async def test_match_nearest_skips_busy_and_picks_nearest_available(db_session):
 # Hospital capacity
 # --------------------------------------------------------------------------- #
 async def test_hospital_capacity_respected(db_session):
-    specialty = f"SPEC_{uuid.uuid4().hex[:8]}"  # unique → isolates from seed data
+    specialty = f"SPEC_{uuid.uuid4().hex[:8]}"  # unique -> isolates from seed data
     hospital = Hospital(
         name="Test Hospital",
         latitude=OSU[0],

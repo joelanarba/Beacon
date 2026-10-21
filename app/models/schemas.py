@@ -1,6 +1,6 @@
 """Pydantic v2 API contracts (request/response shapes).
 
-These are the I/O contracts at the HTTP boundary — distinct from the SQLAlchemy
+These are the I/O contracts at the HTTP boundary - distinct from the SQLAlchemy
 ORM models in ``db.py``. Read models set ``from_attributes=True`` so they can be
 built directly from ORM rows.
 """

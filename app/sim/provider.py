@@ -4,7 +4,7 @@ Two contracts make up a real USSD/SMS provider integration:
 
 1. provider -> app (inbound): the gateway POSTs the user's USSD dial / inbound
    SMS to our webhooks. Those webhooks are the canonical ``/ingest/ussd`` and
-   ``/ingest/sms`` endpoints (see ``ingestion/api.py``) — the HTML harness here
+   ``/ingest/sms`` endpoints (see ``ingestion/api.py``) - the HTML harness here
    drives them with exactly the payload a real gateway would send, so swapping
    in a real provider changes nothing on our side.
 2. app -> provider (outbound): our app asks the gateway to deliver an SMS. That

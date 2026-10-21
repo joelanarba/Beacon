@@ -11,7 +11,7 @@ comparisons were inconclusive. These findings apply to the bounded setup below.
 Tested commit: `4304151015775f6baa3c962f86af074cfe432bdf`. Its hashed study inputs
 match the corrected calibration at `3e946b11cdcba3b7c20f4b55756014ee94c5d15a`;
 the intervening commit changed documentation only. Complete artifacts remain in
-the user's Codespace:
+the Codespaces workspace:
 
 ```text
 /workspaces/Beacon/artifacts/study/calibration-20261021T020432Z
@@ -20,14 +20,14 @@ the user's Codespace:
 /workspaces/Beacon/artifacts/study/batch-20261021T023128Z/measured-analysis
 ```
 
-The user supplied terminal output and a read-only artifact-check summary. The
+This report uses exported terminal output and a read-only artifact-check summary. The
 measured runner and analysis each exited zero. The measured manifest spans
-2026-10-21 02:31:34.151124–03:30:25.078598 UTC, or 3530.927474 seconds, including
+2026-10-21 02:31:34.151124-03:30:25.078598 UTC, or 3530.927474 seconds, including
 setup, warmups, measurements, evidence capture, and teardown. CPython was 3.11.13.
 The local Windows review did not execute Docker or directly read the remote raw
 projects. No remote artifact or original figure was modified during review.
 
-The supplied `RAW_AND_FROZEN_GATE PASS` followed checks that:
+The exported `RAW_AND_FROZEN_GATE PASS` records checks that:
 
 - Revalidated the frozen calibration, source fingerprint, settings, and complete
   forty-trial plan; measured image IDs, host information, and controller-package
@@ -40,9 +40,8 @@ The supplied `RAW_AND_FROZEN_GATE PASS` followed checks that:
   projects. Separate command-log checks found all eighty teardowns successful
   and all eighty subsequent container/volume/network checks empty.
 
-This is a review of supplied real-service evidence summaries. Full file-by-file
-independent reproduction and visual review of the original remote figures remain
-unverified. The earlier calibration at `calibration-20261020T101144Z` remains
+The results are based on exported real-service evidence summaries. Independent
+reproduction and visual review of the original remote figures remain unverified. The earlier calibration at `calibration-20261020T101144Z` remains
 invalid and contributes no observations to these results.
 
 ## Design and environment
@@ -139,7 +138,7 @@ Recovery is controller-observed assignment completion minus controller-observed
 broker application health. None of the twenty outage trials completed before
 that health observation; all completed before their observation deadlines.
 The following descriptive statistics were calculated locally from the ten
-supplied per-policy fault records. The saved analysis does not provide a
+exported per-policy fault records. The saved analysis does not provide a
 bootstrap interval for recovery, and none is claimed here.
 
 | Outage policy | Mean recovery (s) | Observed range (s) | Mean stop-request-to-health observation (s) | Observed range (s) |
@@ -171,34 +170,26 @@ identical realized request timing or broker restart duration.
 
 ## Retained outputs and remaining work
 
-The supplied file listing confirms `summary.json`, `reports.csv`,
+The saved file listing confirms `summary.json`, `reports.csv`,
 `trial_classes.csv`, `paired_differences.csv`, `class_ecdf.png`, `class_ecdf.svg`,
 `paired_p95.svg`, and `recovery_timelines.svg` in `measured-analysis`. Original
 figures were generated successfully but have not been visually reviewed in this
 local checkout. The frozen file, manifests, command logs, package/image records,
 and eighty raw project directories remain the primary evidence.
 
-The smallest justified next step is preserving that evidence and completing
-visual review and write-up. No application or study-code fix, retuning, or
-replacement batch is justified by these passing results. Before removing the
-Codespace, create and copy an evidence archive out of it; these ignored artifacts
-were not added to Git. From the repository root:
+The next step is preserving that evidence and reviewing the original figures.
+No application fix, retuning, or replacement batch is indicated by these results.
+Raw artifacts are ignored by Git. Run the backup script in Codespaces, then
+copy its archive and checksum outside the Codespace:
 
 ```bash
-(
-  set -e
-  ARCHIVE="artifacts/study/scheduling-evidence-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
-  test ! -e "$ARCHIVE"
-  tar -czf "$ARCHIVE" -C artifacts/study calibration-20261021T020432Z batch-20261021T023128Z
-  sha256sum "$ARCHIVE"
-  printf 'evidence_archive=%s\n' "$ARCHIVE"
-)
+bash scripts/backup-evidence.sh
 ```
 
-Keep the original invalid calibration separately. The archive preserves evidence
-files; retain the recorded container images separately for exact environment
-replay. Archive creation, external backup, and independent reproduction have
-not been verified by this review.
+[EVIDENCE_BACKUP.md](EVIDENCE_BACKUP.md) explains the contents and restore steps.
+The archive includes failed and successful integration/study runs and committed
+source history. Container images are not included. Backup creation in Codespaces,
+external storage, and independent reproduction remain unverified.
 
 Generalization remains limited by one shared two-CPU Codespace, ten seed pairs
 per condition, co-located load generation and services, instrumentation overhead,
@@ -210,9 +201,9 @@ real-carrier delivery, clinical benefit, production readiness, or algorithmic
 novelty. Independent environment reproduction and a literature review are
 needed before broader research claims.
 
-Local review validation matched all eight latency-table rows and both recovery
-rows to the supplied numerical evidence at the displayed precision. Relative
-links, Markdown whitespace, Bash syntax in all eight command blocks across the
-five report/status documents, and Git diff checks passed. Only documentation
-changed; hashed study inputs are unchanged. No application test or Docker batch
-was rerun for this report update.
+At report commit `afef34c`, local checks matched all eight latency-table rows
+and both recovery rows to the exported numerical evidence at the displayed
+precision. Link, whitespace, Bash syntax, and diff checks passed. That commit
+changed documentation only; no application test or Docker batch was rerun.
+Later presentation edits change source comments and labels. The measured
+revision remains `4304151`, as recorded in [VALIDATION_HISTORY.md](VALIDATION_HISTORY.md).

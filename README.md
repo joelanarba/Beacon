@@ -1,133 +1,136 @@
-# Beacon — Resilient Emergency Coordination Backend
+# Beacon
 
-Beacon is an emergency-coordination backend prototype. It normalizes app, SMS, and USSD reports, processes dispatch through RabbitMQ, and stores incidents and assignments in PostgreSQL. SMS and USSD use simulated provider callbacks; outbound SMS is recorded in a Redis simulator sink. Live telecom integration and production operation have not been verified.
+Beacon is an emergency-coordination backend built with FastAPI, PostgreSQL,
+RabbitMQ, and Redis. It accepts app reports and simulated SMS/USSD callbacks,
+assigns responders, manages hospital capacity, and publishes dispatcher updates.
+The project focuses on delivery reliability, concurrent state changes, and
+severity scheduling during backlog and broker recovery.
 
-Incident acceptance, assignment, and lifecycle updates now use a transactional outbox. Database constraints and row locks guard duplicate assignments and resource release. Delivery is subject to the guarantees and remaining limitations in [docs/RELIABILITY.md](docs/RELIABILITY.md); no exactly-once delivery or measured performance claim is made.
+SMS and USSD use a local provider simulator. AWS templates are included, but
+live telecom integration and AWS operation have not been verified.
 
----
+## What has been tested
 
-## Architecture Overview
+| Work | Recorded result | Evidence |
+|---|---|---|
+| Real-service integration | 17 scenarios and 30 harness checks passed; 100 nested application regressions passed, including 21 authentication cases | [Integration tests](docs/INTEGRATION_TESTING.md) |
+| Scheduling study | 40 measured trials and 40 separate warmups passed; all 6,400 measured reports completed assignment | [Study results](docs/RESEARCH_RESULTS.md) |
+| Isolation | All 18 integration projects and all 80 measured-batch projects passed teardown and empty-resource checks | [Validation history](docs/VALIDATION_HISTORY.md) |
 
-Beacon's ingestion pipeline normalizes inbound reports from multiple channels into a unified event structure, decoupling ingestion logic from the downstream dispatch and notification engine.
+The integration result applies to `cd9c753`; the measured study applies to
+`4304151`. Later presentation changes do not turn those into fresh test runs.
+The evidence records exact revisions, commands, service identities, and outputs.
 
-```
-[Web/Mobile App]   [USSD Menu (*920#)]   [SMS (e.g. "MED collapsed")]
-       │                    │                     │
-       └──────────┬─────────┴─────────────────────┘
-                  ▼
-         [FastAPI Ingestion] (Input normalization & validation)
-                  │
-                  ▼
-         [RabbitMQ Bus] (Priority-ordered queues based on severity)
-                  │
-                  ▼
-         [Dispatch Engine]
-          ├── Redis GEO (Nearest available responder query)
-          └── Postgres (Hospital specialty & bed capacity check)
-                  │
-                  ▼
-         [Notification Engine] ──> WebSocket (App) or SMS (Feature phone)
-```
+The scheduling study compared equal priority with severity priority in both the
+PostgreSQL outbox and RabbitMQ, using ten paired seeds per condition. The table
+shows mean paired p95 differences in record-to-assignment seconds, with
+exploratory 95% bootstrap intervals. Negative values mean shorter durations
+under severity scheduling.
 
-### Core Features
+| Condition | CRITICAL p95 difference | STANDARD p95 difference |
+|---|---:|---:|
+| Healthy burst | -16.370 s [-21.274, -13.493] | -1.546 s [-5.836, +1.106] |
+| Broker outage | -11.176 s [-13.162, -9.370] | +2.625 s [+0.501, +4.619] |
 
-* **Multi-Channel Ingestion & Normalization**: Normalizes HTTP app payloads (GPS coordinates, image URLs), simulated USSD callback sequences, and keyword-parsed SMS into a unified `IncidentEvent` model.
-* **Severity Queuing**: Sets RabbitMQ message priorities from the reported severity. Priority applies to messages waiting in the broker; prefetch and processing concurrency affect observed order. SMS/USSD use type-based defaults, not clinical text classification.
-* **Geospatial Responder Matching**: Employs **Redis GEO** commands for low-latency, real-time proximity lookups to match the closest available responder of the required type.
-* **Hospital Capacity Locking**: Checks capabilities and reserves bed space in **PostgreSQL** (using SQLAlchemy 2.0 and asyncpg) under database transactions designed to prevent double-booking under high concurrency.
-* **Outbound Notification Simulation**: Publishes dispatcher updates through a local WebSocket hub and records simulated SMS. SMS exceptions use durable retry/dead-letter storage. App responder delivery, reconnect replay, and multi-instance WebSocket fan-out remain incomplete.
-* **Local Provider Simulator**: Includes a mock gateway integration that mimics the Africa's Talking callback contract, allowing local testing of USSD session navigation (`*920#`) and SMS handling.
+CRITICAL durations were lower in both conditions. STANDARD durations increased
+during outages; the healthy STANDARD comparison was inconclusive. Mean overall
+recovery was descriptively 2.353 seconds longer under severity scheduling. These
+are finite-burst results from one shared Codespace, with send-time drift and
+prefetch one. They do not establish sustained throughput or production capacity.
 
----
+## Processing path
 
-## Tech Stack
+1. Ingestion commits the incident, audit entry, and outbox event in one
+   PostgreSQL transaction.
+2. The outbox relay publishes persistent events to RabbitMQ with publisher
+   confirms. Broker outages leave unpublished work in PostgreSQL.
+3. Dispatch locks the incident, reserves an available responder and any required
+   hospital capacity, then commits the assignment and its notification event.
+4. Notification consumers publish dispatcher WebSocket updates and record
+   simulated SMS. Failed processing uses bounded retries and database dead letters.
 
-* **API & Core Logic**: FastAPI (Asynchronous Python)
-* **Message Broker**: RabbitMQ (using native priority queues)
-* **Database**: PostgreSQL (SQLAlchemy 2.0 Async + Alembic)
-* **Cache & Geo-indexing**: Redis (GEO commands & USSD state machine)
-* **Auth**: JWT (with access and refresh token rotation)
-* **Observability**: Prometheus & Grafana (real-time metrics dashboard)
-* **Containerization**: Docker & Docker Compose
+Row locks and constraints guard duplicate assignments and resource release.
+Publication is at least once. SMS and socket effects can repeat after a crash;
+Beacon does not provide exactly-once recipient delivery. The full contract is in
+[RELIABILITY.md](docs/RELIABILITY.md).
 
----
+## Local setup
 
-## Getting Started
+Install Docker Engine and Docker Compose v2, then run from the repository root:
 
-### Prerequisites
-* Docker and Docker Compose
-
-### 1. Environment Setup
-Clone the repository and copy the example environment configuration:
 ```bash
 cp .env.example .env
 ```
-*(Open `.env` and set a secure, random string for `SECRET_KEY`)*
 
-### 2. Boot Services
-Spin up the PostgreSQL, Redis, RabbitMQ, FastAPI, Prometheus, and Grafana containers:
+Replace `SECRET_KEY` in `.env` with a random value of at least 32 characters.
+`openssl rand -hex 32` can generate one. The service passwords in the example
+are for the local demo.
+
 ```bash
 docker compose up -d --build
-```
-
-### 3. Initialize Database & Seed Data
-Apply the versioned migrations, then seed mock responders, hospitals, and local dispatcher credentials:
-```bash
 docker compose exec app alembic upgrade head
 docker compose exec app python seed.py
 ```
 
-### 4. Run Tests
-For automated disposable PostgreSQL, Redis, and RabbitMQ tests in Codespaces,
-see [the real-service test guide](docs/INTEGRATION_TESTING.md):
+After migrations and seeding:
+
+- API documentation: [localhost:8000/docs](http://localhost:8000/docs)
+- Provider simulator: [localhost:8000/sim/](http://localhost:8000/sim/)
+- Readiness: [localhost:8000/ready](http://localhost:8000/ready)
+- Local dispatcher: `dispatcher@example.com` / `beacon-dispatch`
+
+The simulator accepts SMS and USSD reports and shows the dispatcher feed and
+Redis SMS sink. The tracked Compose file publishes only port 8000. Grafana,
+Prometheus, and the RabbitMQ console require an explicit local port override
+before they can be opened from the host.
+
+## Integration tests
+
+The test runner starts disposable PostgreSQL, Redis, and RabbitMQ services. It
+uses its own configuration, synthetic data, and randomly assigned loopback ports.
+It does not use the development `.env` or database.
+
 ```bash
 .venv-integration/bin/python scripts/run_integration.py
 ```
 
-Run tests against explicitly configured disposable services as described in [docs/RELIABILITY.md](docs/RELIABILITY.md). With no test-service URLs configured, service-dependent tests are skipped:
+See [INTEGRATION_TESTING.md](docs/INTEGRATION_TESTING.md) for Codespaces setup,
+coverage, evidence files, and cleanup rules. A unit-only run with service tests
+skipped is not equivalent to this suite.
+
+## Research and evidence
+
+The completed study is documented in [RESEARCH_RESULTS.md](docs/RESEARCH_RESULTS.md).
+The [study plan](docs/RESEARCH_PLAN.md) defines the question and controls;
+[RESEARCH_RUNNING.md](docs/RESEARCH_RUNNING.md) contains the commands and artifact
+format. Experimental code lives in `experiments/`, outside the production image.
+
+Raw runs, failed attempts, plots, environments, local notes, and backups are
+ignored by Git. Keep the raw evidence outside Codespaces as well:
+
 ```bash
-docker compose exec app pytest -q
+bash scripts/backup-evidence.sh
 ```
 
----
+Follow [EVIDENCE_BACKUP.md](docs/EVIDENCE_BACKUP.md) to download and check the
+archive. The backup includes the committed source history and saved experiment
+files, without copying the root `.env` or live service volumes.
 
-## Interactive Simulation Dashboard
+## Limits and remaining work
 
-To test the system without a live carrier gateway, open the simulator console in your browser:
-**[http://localhost:8000/sim/](http://localhost:8000/sim/)**
+- Callback authentication, request-size limits, and a broader dependency review
+  are still needed before public ingress.
+- Missing locations can fall back to an Accra centroid. The study uses explicit GPS.
+- Offline recipient delivery, reconnect replay, app-responder routing, and
+  WebSocket fan-out across app instances are incomplete.
+- Outbox and dead-letter retention and administrative replay remain manual work.
+- The original study figures still need visual review, and independent
+  reproduction on another environment has not been verified.
 
-The dashboard provides four panels to simulate realistic user and responder flows:
-* **USSD Dialer**: Simulates dialing `*920#` on a feature phone and walking through the menu state machine.
-* **Inbound SMS**: Sends custom SMS alerts (e.g., `MED collapsed at Osu`) to verify keyword-based ingestion.
-* **Dispatcher Feed**: Displays live assignments and status transitions via WebSockets.
-* **Outbound SMS**: Logs outgoing SMS alerts sent to responders who do not have internet connectivity.
-
-### Port & Credential Reference
-* **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-* **Grafana Dashboard**: [http://localhost:3000](http://localhost:3000) (Credentials: `admin` / `admin`)
-* **RabbitMQ Console**: [http://localhost:15672](http://localhost:15672) (Credentials: `beacon` / `beacon`)
-* **Seeded Dispatcher**: `dispatcher@example.com` / `beacon-dispatch` (local demonstration only)
-
-Only the app port is published by the tracked Compose file. Grafana and RabbitMQ console URLs require an explicit local port override; an ignored override on one developer's machine is not part of a clean checkout.
-
----
-
-## AWS Pilot Deployment
-
-For a controlled production pilot on AWS, use the Terraform and deployment scripts under `infra/aws` and `scripts/aws`. The full operational runbook is in [docs/production/aws.md](docs/production/aws.md).
-
----
-
-## Project Roadmap
-
-Future enhancements for the platform include:
-* **Incident Timeline Replay**: Implementing event sourcing / append-only replay logs to reconstruct incident timelines for post-event audit.
-* **Geocoding API Integration**: Integrating an external geocoding API to parse natural-language SMS/USSD locations into GPS coordinates.
-* **Production Gateway Hook**: Directing incoming webhooks to live telecom gateway sandboxes.
-* **Horizontal WebSocket Scaling**: Integrating Redis Pub/Sub to sync WebSocket events across multiple backend app instances.
-
----
+See [SECURITY_REVIEW.md](docs/SECURITY_REVIEW.md) for the security backlog. The
+[AWS deployment reference](docs/production/aws.md) describes unverified templates;
+no cloud deployment is required to reproduce the Codespaces study.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+[MIT](LICENSE)

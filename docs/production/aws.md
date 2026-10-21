@@ -1,8 +1,11 @@
-# AWS Production Runbook
+# AWS deployment template
 
-This runbook describes the controlled-pilot path for Beacon on AWS.
+This is a reference for the Terraform and PowerShell files in this repository.
+No AWS deployment, restore, or rollback was verified by the project validation.
+The completed evaluation uses Codespaces. Review the remaining work in
+[SECURITY_REVIEW.md](../SECURITY_REVIEW.md) before planning public ingress.
 
-## Architecture
+## Planned architecture
 
 - ECS Fargate runs the FastAPI container behind an Application Load Balancer.
 - RDS PostgreSQL stores incidents, users, hospitals, responders, assignments, and refresh tokens.
@@ -39,7 +42,7 @@ This runbook describes the controlled-pilot path for Beacon on AWS.
 
 The deployment script bootstraps ECR, builds and pushes the app image, applies Terraform, runs `alembic upgrade head` as a one-off ECS task, waits for the ECS service to stabilize, and checks `/health`.
 
-## Production Route Policy
+## Route settings
 
 For pilot and production environments, keep these Terraform values locked down:
 
@@ -114,15 +117,15 @@ Do not roll back database migrations unless a specific down migration has been r
 
 ## Backups and Recovery
 
-- RDS automated backups are enabled with 7-day retention.
+- The Terraform template configures RDS backups with 7-day retention; a restore drill is still required.
 - Before public launch, perform a restore drill into a temporary RDS instance.
 - Keep deletion protection enabled for production databases.
 - Export critical CloudWatch logs before deleting any environment.
 
 ## Observability
 
-- App logs are written to `/ecs/beacon-staging` in CloudWatch.
-- CloudWatch alarms are created for unhealthy ALB targets and elevated 5xx responses.
+- The template sends app logs to `/ecs/beacon-staging` in CloudWatch.
+- The template defines alarms for unhealthy ALB targets and elevated 5xx responses.
 - Keep Prometheus and Grafana private. Do not expose their ports publicly in AWS.
 
 ## Pilot Launch Checklist

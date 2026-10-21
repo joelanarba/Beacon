@@ -1,4 +1,4 @@
-"""AuthMiddleware — stateless access-token gate.
+"""AuthMiddleware - stateless access-token gate.
 
 Every request must carry a valid ``Bearer`` *access* token, except the configured
 open allowlist: health, auth endpoints, and the ingestion channels (open by

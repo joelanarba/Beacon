@@ -1,6 +1,6 @@
 """Event payload contracts (the wire format on the bus).
 
-These pydantic models are what actually travels through RabbitMQ — distinct from
+These pydantic models are what actually travels through RabbitMQ - distinct from
 the in-process ``IncidentEvent`` dataclass (a channel-parse result) and the
 SQLAlchemy ORM rows (persistence). Keeping them separate means the bus schema
 can evolve without dragging either of the other two along.

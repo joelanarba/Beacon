@@ -1,4 +1,4 @@
-"""Dispatch engine: consume ``incident.reported`` → match → assign → emit.
+"""Dispatch engine: consume ``incident.reported`` -> match -> assign -> emit.
 
 The engine is channel-agnostic: it consumes the normalised ``IncidentReported``
 event and never asks which channel it came from (except to label the latency

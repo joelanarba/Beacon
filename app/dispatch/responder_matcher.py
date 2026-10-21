@@ -3,13 +3,13 @@
 Live responder positions are ephemeral and high-churn, so they live in a Redis
 GEO set (``responders:live``), not Postgres. Matching is a two-step join:
 
-1. ``GEOSEARCH`` the GEO set in an expanding radius → candidate ids, nearest
+1. ``GEOSEARCH`` the GEO set in an expanding radius -> candidate ids, nearest
    first. Redis does the distance ranking for us.
 2. Filter those candidates against Postgres for the required responder type and
    ``AVAILABLE`` status (type/status are authoritative in the DB, not Redis).
 
-The first candidate that survives the filter — i.e. the nearest available
-responder of the right discipline — wins. If a radius yields no survivor we widen
+The first candidate that survives the filter - i.e. the nearest available
+responder of the right discipline - wins. If a radius yields no survivor we widen
 and retry, up to the configured ceiling.
 """
 
@@ -70,7 +70,7 @@ async def match_nearest(
                 sort="ASC",
                 withdist=True,
             )
-        except Exception as exc:  # noqa: BLE001 — Redis down is non-fatal here
+        except Exception as exc:  # noqa: BLE001 - Redis down is non-fatal here
             log.warning("match.geo_unavailable", error=str(exc))
             return None
 
