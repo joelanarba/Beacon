@@ -1,9 +1,10 @@
 # Running the scheduling study
 
-Status on 2026-10-21: **corrected Docker calibration and saved-evidence gate
-passed; ready to freeze settings**. All four trials and four separate warmups
-passed, with nine successful, verified-empty project teardowns. The first
-calibration remains invalid. The forty-run measured study has not started.
+Status on 2026-10-21: **forty measured trials, forty warmups, and saved-evidence
+checks passed**. All 6400 measured reports completed, and all eighty measured
+batch projects were verified empty after cleanup. The [results report](RESEARCH_RESULTS.md)
+records the CRITICAL latency benefit, STANDARD outage cost, recovery observations,
+uncertainty, and limitations. The first calibration remains invalid.
 The 17 passing incident-processing scenarios in
 [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md) validate the earlier correctness
 checkpoint, not this study launcher. The question, hypotheses, and limitations
@@ -55,9 +56,10 @@ is a declared experimental control, not application processing work.
 
 ## Freeze and measured batch, after calibration review
 
-The corrected calibration below has passed review. In the same Codespace, use
-this block to analyze its saved artifacts, freeze its unchanged settings, and
-run the measured batch. Each attempt gets a fresh output directory. The block
+The corrected calibration and subsequent measured batch below have completed.
+This block records the procedure used; a further batch is not needed for the
+current checkpoint. For a future replication in the same unchanged Codespace,
+each attempt gets a fresh output directory. The block
 stops if pulling, calibration analysis, or freezing fails; it still analyzes a
 failed measured batch so invalid results remain visible.
 
@@ -83,10 +85,10 @@ failed measured batch so invalid results remain visible.
 
 No dependency reinstall or calibration rerun is needed for this reviewed
 checkpoint. Documentation-only changes do not affect the source fingerprint;
-the runner checks the hashed application, study, and harness inputs. Paste the
-printed directory, trial summaries, and both exit codes after completion, then
-review the saved manifest, raw evidence, class results, paired comparisons, and
-cleanup before interpreting the measured study.
+the runner checks the hashed application, study, and harness inputs. The recorded
+batch's manifests, raw evidence, class results, paired comparisons, and cleanup
+have now passed the supplied saved-evidence review. Review any future replication
+separately and preserve all its results.
 
 The freeze step rechecks all four calibration trials, separate warmups, raw-file
 hashes, priorities, completion, observed backlog, invariants, and cleanup. It
@@ -321,15 +323,35 @@ does not establish a scheduling benefit or uncertainty across repetitions.
 All nine owned projects (one build, four warmups, four trials) had successful
 scoped teardown and empty container/volume/network checks: **9 / 9 / 9**.
 Follow-up ownership-label listings were empty. No owned data-resource leak was
-observed; retained images/build cache and evidence are intentional. Artifact-only
-plot generation, freezing, and the forty-run measured batch remain unrun for
-this calibration at this checkpoint. The smallest justified next step is the
-freeze-and-batch block above; no application or study-code fix is indicated.
+observed; retained images/build cache and evidence are intentional. At that
+calibration-only checkpoint, artifact-only plot generation, freezing, and the
+forty-run measured batch had not run. They subsequently completed as recorded
+below, without an application or study-code change.
 
 This documentation checkpoint passed local diff checks, relative-link checks,
 and Bash syntax validation of the freeze-and-batch block. Only four Markdown
 files changed; hashed study inputs are unchanged. No application tests or Docker
 trials were rerun for the documentation update.
+
+## Measured batch: passed on 2026-10-21
+
+The recorded procedure analyzed calibration, froze the unchanged settings, and
+executed `experiments.run run`, then `experiments.analyze`. The measured runner
+and analysis each exited zero at tested revision
+`4304151015775f6baa3c962f86af074cfe432bdf`. The evidence root is:
+
+```text
+/workspaces/Beacon/artifacts/study/batch-20261021T023128Z
+```
+
+The user supplied a read-only saved-artifact check confirming forty passed trials,
+forty passed warmups, and `RAW_AND_FROZEN_GATE PASS`. All 6400 measured reports
+and 320 warmup reports completed with no unresolved work or dead letters. Every
+measured trial observed mixed-class backlog and had no censored completion.
+All eighty project teardowns and subsequent empty-resource checks passed;
+follow-up ownership-label listings were empty. Full metrics, statistical
+interpretation, provenance, original-figure review limitations, and evidence
+archive commands are in [RESEARCH_RESULTS.md](RESEARCH_RESULTS.md).
 
 ## Local verification and unrun work
 

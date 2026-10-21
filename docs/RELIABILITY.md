@@ -167,8 +167,13 @@ separate warmups, including the saved raw-evidence gate. All 640 calibration
 reports completed without censoring, unresolved work, or dead letters, and all
 nine owned projects were verified empty after cleanup. The first calibration
 remains invalid due to its premature broker readiness boundary. Observed
-send-time drift is documented; the forty-run measured study remains unrun and
-no scheduling improvement has been established.
+send-time drift is documented. The subsequent forty-trial measured batch at
+`4304151015775f6baa3c962f86af074cfe432bdf` passed its saved-evidence checks:
+6400 measured reports and 320 separate warmup reports completed, with no
+unresolved work or dead letters, and all eighty owned projects were verified
+empty after cleanup. [RESEARCH_RESULTS.md](RESEARCH_RESULTS.md) records the
+bounded CRITICAL latency benefit, STANDARD outage cost, and recovery limitations.
+These study outcomes use database assignment as the completion endpoint.
 
 ## Verification on 2026-10-19
 

@@ -1,13 +1,13 @@
 # Focused study: severity scheduling during backlog and broker recovery
 
-Status on 2026-10-21: **corrected Docker calibration and saved-evidence gate
-passed; ready to freeze settings**. All four trials and four separate warmups
-passed at `3e946b11cdcba3b7c20f4b55756014ee94c5d15a`, with mixed-class backlog,
-complete assignments, and all nine owned projects verified empty after cleanup.
-The first calibration remains invalid. The forty-run measured study remains
-unrun; no scheduling improvement or novelty claim is established. Evidence,
-observed send-time drift, and execution steps are in
-[RESEARCH_RUNNING.md](RESEARCH_RUNNING.md).
+Status on 2026-10-21: **forty measured trials, forty warmups, and saved-evidence
+checks passed** at `4304151015775f6baa3c962f86af074cfe432bdf`. All 6400 measured
+reports completed, mixed-class backlog was observed in every trial, and all
+eighty batch projects were verified empty after cleanup. The first calibration
+remains invalid. The [results report](RESEARCH_RESULTS.md) records lower CRITICAL
+latency in both conditions, a STANDARD latency cost during outages, uncertainty,
+and limitations. No novelty or general production claim is established.
+Reproduction commands are in [RESEARCH_RUNNING.md](RESEARCH_RUNNING.md).
 The real-service correctness gate, including authentication, passed at
 `cd9c753d6ef8587fd7b9f15e3710c41c86cc7a22`; see
 [INTEGRATION_TESTING.md](INTEGRATION_TESTING.md). Remaining public-ingress
@@ -149,7 +149,8 @@ or exactly-once outcome in this experiment.
    timeline from the raw artifacts. Report negative and inconclusive results.
 
 The [execution guide](RESEARCH_RUNNING.md) provides the runner and artifact-only
-analysis commands, local validation evidence, and the passing calibration gate.
+analysis commands, local validation evidence, and the passing calibration and
+measured gates. The [results report](RESEARCH_RESULTS.md) evaluates this procedure.
 The runner rejects invalid configuration and reused output directories, returns
 nonzero on correctness/cleanup failure or an unobserved mixed-class backlog,
 and preserves invalid trials. Offline dry runs generate plans only. Four real
@@ -169,5 +170,8 @@ The research checkpoint is complete only when another developer can reproduce
 the pinned setup, execute the declared trials, regenerate the figures, and trace
 every reported number to retained raw observations and correctness checks. The
 report must explain the mechanism, fairness tradeoff, uncertainty, and limitations.
-Until then Beacon has a tested systems implementation and a passing real-service
-calibration; the repeated measured comparison and research report are unfinished.
+The first controlled batch and supplied raw/table-analysis checks have completed;
+their findings and limitations are recorded in [RESEARCH_RESULTS.md](RESEARCH_RESULTS.md).
+Evidence backup, visual inspection of the original remote figures, and independent
+reproduction remain unverified. Broader research claims still require that work
+and a literature review.
